@@ -8,7 +8,7 @@ import os
 pygame.init()
 
 # Constants
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1000, 800
 BACKGROUND_COLOR = (200, 200, 200)
 ESCALATOR_COLORS = [(100, 100, 100), (120, 120, 120), (140, 140, 140)]
 ESCALATOR_SPEEDS = [2, 3, 4]  # Different speeds for each escalator
@@ -29,6 +29,7 @@ GAME_STATE_FAILURE = 4
 # Game modes
 GAME_MODE_SINGLE = 0  # Target appears only once
 GAME_MODE_MULTIPLE = 1  # Target appears multiple times
+GAME_MODE_INFINITE = 2  # Infinite mode with time bonuses
 
 # Character spawn rate
 CHARACTER_SPAWN_RATE = 60  # Frames between character spawns
@@ -41,7 +42,7 @@ TITLE_FONT = pygame.font.SysFont('Arial', 48, bold=True)
 
 # Initialize the screen
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Jogo memoria Escada Rolante")
+pygame.display.set_caption("Escalator Memory Game")
 clock = pygame.time.Clock()
 
 # Load assets
@@ -123,15 +124,15 @@ def load_assets():
             img = pygame.Surface((CHARACTER_SIZE, CHARACTER_SIZE//2), pygame.SRCALPHA)
             color = (random.randint(50, 250), random.randint(50, 250), random.randint(50, 250))
             if i % 3 == 0:  # Top hat
-                pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, CHARACTER_SIZE//4))
+                pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, 10))
                 pygame.draw.rect(img, color, (CHARACTER_SIZE//3, 0, CHARACTER_SIZE//3, CHARACTER_SIZE//4))
             elif i % 3 == 1:  # Cap
-                pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, CHARACTER_SIZE//4))
+                pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, 10))
                 pygame.draw.polygon(img, color, [(CHARACTER_SIZE//4, CHARACTER_SIZE//4), 
                                                 (CHARACTER_SIZE*3//4, CHARACTER_SIZE//4), 
                                                 (CHARACTER_SIZE//2, 0)])
             else:  # Crown
-                pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, CHARACTER_SIZE//4))
+                pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, 10))
                 pygame.draw.polygon(img, color, [(CHARACTER_SIZE//4, CHARACTER_SIZE//4), 
                                                 (CHARACTER_SIZE//3, 0), 
                                                 (CHARACTER_SIZE//2, CHARACTER_SIZE//4), 
@@ -157,10 +158,29 @@ class Character:
         self.traits = traits  # Dictionary of traits
         self.size = CHARACTER_SIZE
         self.escalator_index = None  # Which escalator the character is on
+        self.step_position = 0  # Position on the current step (0-1)
+        self.current_step = 0  # Which step the character is currently on
     
-    def update(self, speed):
-        # Move the character down the escalator
-        self.y += speed
+    def update(self, speed, escalator):
+        # The character should move with the escalator steps
+        # Calculate the step height and how many steps fit in the screen
+        step_height = 20
+        total_steps = HEIGHT // step_height
+        
+        # Update the step position based on the escalator speed
+        # This creates a synchronized movement effect
+        self.step_position += speed / step_height
+        
+        # If we've moved past a step, move to the next one
+        if self.step_position >= 1:
+            self.current_step += 1
+            self.step_position -= 1
+        
+        # Calculate the y position based on the current step and position within the step
+        self.y = (self.current_step * step_height) + (self.step_position * step_height)
+        
+        # Make sure the character stays centered on the escalator
+        self.x = escalator.x + (escalator.width - self.size) // 2
     
     def draw(self, screen):
         # Draw body
@@ -278,16 +298,22 @@ class Escalator:
         self.speed = speed
         self.color = color
         self.characters = []
+        self.step_offset = 0  # For animating the escalator steps
     
     def add_character(self, character):
         # Add a character to this escalator
         character.escalator_index = ESCALATOR_SPEEDS.index(self.speed)
+        character.current_step = -3  # Start above the screen
+        character.step_position = 0
         self.characters.append(character)
     
     def update(self):
+        # Update the step animation
+        self.step_offset = (self.step_offset + self.speed) % 20  # 20 is the step height
+        
         # Update all characters on this escalator
         for character in self.characters[:]:
-            character.update(self.speed)
+            character.update(self.speed, self)
             # Remove characters that have gone off screen
             if character.y > HEIGHT:
                 self.characters.remove(character)
@@ -298,12 +324,12 @@ class Escalator:
         
         # Draw line segments to represent the escalator steps
         step_height = 20
-        for y in range(0, HEIGHT, step_height):
-            # Adjust the y position based on time for animation
-            adjusted_y = (y + pygame.time.get_ticks() * self.speed / 100) % HEIGHT
+        for y in range(0, HEIGHT + step_height, step_height):
+            # Adjust the y position based on step_offset for animation
+            adjusted_y = (y + self.step_offset) % (HEIGHT + step_height)
             pygame.draw.line(screen, (50, 50, 50), 
-                            (self.x, adjusted_y), 
-                            (self.x + self.width, adjusted_y), 2)
+                           (self.x, adjusted_y), 
+                           (self.x + self.width, adjusted_y), 2)
         
         # Draw all characters on this escalator
         for character in self.characters:
@@ -336,21 +362,28 @@ class Game:
         self.has_target_spawned = False
         self.target_spawned_time = 0
         self.character_factory = CharacterFactory(CHARACTER_ASSETS)
+        self.time_bonus = 5  # Time added for correct clicks in infinite mode
         
         # Create buttons for menu
         button_width, button_height = 200, 50
         button_x = WIDTH // 2 - button_width // 2
         
         self.single_mode_button = Button(
-            button_x, HEIGHT // 2 - 30, 
+            button_x, HEIGHT // 2 - 70, 
             button_width, button_height, 
             "Single Appearance Mode"
         )
         
         self.multiple_mode_button = Button(
-            button_x, HEIGHT // 2 + 40, 
+            button_x, HEIGHT // 2, 
             button_width, button_height, 
             "Multiple Appearances Mode"
+        )
+
+        self.infinite_mode_button = Button(
+            button_x, HEIGHT // 2 + 70, 
+            button_width, button_height, 
+            "Infinite Mode"
         )
         
         # Create the three escalators
@@ -358,6 +391,20 @@ class Game:
             x = ESCALATOR_START_X + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
             escalator = Escalator(x, ESCALATOR_WIDTH, ESCALATOR_SPEEDS[i], ESCALATOR_COLORS[i])
             self.escalators.append(escalator)
+        
+        # Load menu background image
+        self.menu_image = self.load_menu_image()
+    
+    def load_menu_image(self):
+        if os.path.exists("assets/misc/menu.png"):
+            try:
+                return pygame.image.load("assets/misc/menu.png")
+            except pygame.error:
+                print("Menu image found but couldn't be loaded, using default menu.")
+                return False
+        else:
+            print("Menu image not found, using default menu.")
+            return False
     
     def select_new_target(self):
         # Create a target character (not placed on any escalator yet)
@@ -386,6 +433,7 @@ class Game:
                                                 self.game_state == GAME_STATE_FAILURE):
                     # Restart the game
                     self.reset_game()
+                    self.game_state = GAME_STATE_DISPLAY_TARGET  # Ensure it goes back to displaying the target
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if self.game_state == GAME_STATE_MENU:
                     # Check if either game mode button was clicked
@@ -395,6 +443,10 @@ class Game:
                         self.game_state = GAME_STATE_DISPLAY_TARGET
                     elif self.multiple_mode_button.is_clicked(mouse_pos):
                         self.game_mode = GAME_MODE_MULTIPLE
+                        self.reset_game()
+                        self.game_state = GAME_STATE_DISPLAY_TARGET
+                    elif self.infinite_mode_button.is_clicked(mouse_pos):
+                        self.game_mode = GAME_MODE_INFINITE
                         self.reset_game()
                         self.game_state = GAME_STATE_DISPLAY_TARGET
                         
@@ -413,8 +465,13 @@ class Game:
                                     # In multiple mode, we continue until all instances are found or wrong click
                                     # Remove the character from escalator
                                     escalator.characters.remove(clicked_character)
-                                    if self.score >= self.target_max_spawns:
+                                    if self.game_mode == GAME_MODE_MULTIPLE and self.score >= self.target_max_spawns:
                                         self.game_state = GAME_STATE_SUCCESS
+                                    elif self.game_mode == GAME_MODE_INFINITE:
+                                        # Add time bonus for infinite mode
+                                        self.time_limit += self.time_bonus
+                                        # Spawn a new target immediately to keep the game going
+                                        self.has_target_spawned = False
                             else:
                                 # Wrong character clicked
                                 self.game_state = GAME_STATE_FAILURE
@@ -424,6 +481,7 @@ class Game:
         if self.game_state == GAME_STATE_MENU:
             self.single_mode_button.check_hover(mouse_pos)
             self.multiple_mode_button.check_hover(mouse_pos)
+            self.infinite_mode_button.check_hover(mouse_pos)
     
     def reset_game(self):
         # Reset the game state
@@ -493,13 +551,21 @@ class Game:
                     else:
                         # Always spawn a random non-target character
                         self.spawn_character(target=False)
-                else:  # GAME_MODE_MULTIPLE
+                elif self.game_mode == GAME_MODE_MULTIPLE:
                     # In multiple mode, spawn the target multiple times
                     if self.target_spawn_count < self.target_max_spawns and random.random() < 0.15:
                         # 15% chance to spawn target each time
                         self.spawn_character(target=True)
                     else:
                         # Spawn a random non-target character
+                        self.spawn_character(target=False)
+                elif self.game_mode == GAME_MODE_INFINITE:
+                    # In infinite mode, always make sure there's one target
+                    if not self.has_target_spawned and random.random() < 0.2:
+                    # 20% chance to spawn target when there isn't one
+                        self.spawn_character(target=True)
+                    else:
+                    # Spawn a random non-target character
                         self.spawn_character(target=False)
     
     def draw_character_traits(self, y_pos):
@@ -516,23 +582,31 @@ class Game:
     
     def draw_menu(self):
         # Draw menu screen
-        title = TITLE_FONT.render("Escalator Memory Game", True, (50, 50, 150))
-        screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4))
+        if self.menu_image:
+            # If the menu image exists, blit it to the screen
+            screen.blit(self.menu_image, (0, 0))  # Draw the image at the top-left corner
+        else:
+            # If the image doesn't exist, draw the default menu
+            title = TITLE_FONT.render("Escalator Memory Game", True, (50, 50, 150))
+            screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4))
+
+            instructions = SMALL_FONT.render("Select Game Mode:", True, (0, 0, 0))
+            screen.blit(instructions, (WIDTH//2 - instructions.get_width()//2, HEIGHT//2 - 120))
         
-        instructions = SMALL_FONT.render("Select Game Mode:", True, (0, 0, 0))
-        screen.blit(instructions, (WIDTH//2 - instructions.get_width()//2, HEIGHT//2 - 80))
+            # Draw game mode selection buttons
+            self.single_mode_button.draw(screen)
+            self.multiple_mode_button.draw(screen)
+            self.infinite_mode_button.draw(screen)
         
-        # Draw game mode selection buttons
-        self.single_mode_button.draw(screen)
-        self.multiple_mode_button.draw(screen)
+            # Draw game mode descriptions
+            single_desc = TINY_FONT.render("Find the character shown at start (appears once)", True, (0, 0, 0))
+            multiple_desc = TINY_FONT.render(f"Find all {self.target_max_spawns} appearances of the character", True, (0, 0, 0))
+            infinite_desc = TINY_FONT.render("Find characters to earn more time - play until you lose!", True, (0, 0, 0))
         
-        # Draw game mode descriptions
-        single_desc = TINY_FONT.render("Find the character shown at start (appears once)", True, (0, 0, 0))
-        multiple_desc = TINY_FONT.render(f"Find all {self.target_max_spawns} appearances of the character", True, (0, 0, 0))
-        
-        screen.blit(single_desc, (WIDTH//2 - single_desc.get_width()//2, HEIGHT//2 + 5))
-        screen.blit(multiple_desc, (WIDTH//2 - multiple_desc.get_width()//2, HEIGHT//2 + 75))
-    
+            screen.blit(single_desc, (WIDTH//2 - single_desc.get_width()//2, HEIGHT//2 - 35))
+            screen.blit(multiple_desc, (WIDTH//2 - multiple_desc.get_width()//2, HEIGHT//2 + 35))
+            screen.blit(infinite_desc, (WIDTH//2 - infinite_desc.get_width()//2, HEIGHT//2 + 105))
+   
     def draw(self):
         # Clear the screen
         screen.fill(BACKGROUND_COLOR)
@@ -542,7 +616,13 @@ class Game:
             
         elif self.game_state == GAME_STATE_DISPLAY_TARGET:
             # Display the target character
-            mode_text = "Single Appearance Mode" if self.game_mode == GAME_MODE_SINGLE else "Multiple Appearances Mode"
+            if self.game_mode == GAME_MODE_SINGLE:
+                mode_text = "Single Appearance Mode"
+            elif self.game_mode == GAME_MODE_MULTIPLE:
+                mode_text = "Multiple Appearances Mode"
+            else:
+                mode_text = "Infinite Mode"
+
             mode_render = SMALL_FONT.render(mode_text, True, (50, 50, 150))
             screen.blit(mode_render, (WIDTH//2 - mode_render.get_width()//2, 20))
             
@@ -571,12 +651,17 @@ class Game:
             screen.blit(time_text, (10, 10))
             
             # Display score
-            mode_text = "Find once" if self.game_mode == GAME_MODE_SINGLE else f"Find {self.target_spawn_count}/{self.target_max_spawns}"
+            if self.game_mode == GAME_MODE_SINGLE:
+                mode_text = "Find once"
+            elif self.game_mode == GAME_MODE_MULTIPLE:
+                mode_text = f"Find {self.target_spawn_count}/{self.target_max_spawns}"
+            else:  # Infinite mode
+                mode_text = f"+{self.time_bonus}s per find"
             score_text = SMALL_FONT.render(f"Score: {self.score} - {mode_text}", True, (0, 0, 0))
             screen.blit(score_text, (10, 40))
             
             # In case of multiple mode, show a small reminder of what the character looks like
-            if self.game_mode == GAME_MODE_MULTIPLE:
+            if self.game_mode != GAME_MODE_SINGLE:
                 reminder_text = TINY_FONT.render("Target Character:", True, (0, 0, 0))
                 screen.blit(reminder_text, (10, 70))
                 
@@ -602,8 +687,9 @@ class Game:
             score_text = FONT.render(f"Score: {self.score}", True, (0, 0, 0))
             screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, HEIGHT//2))
             
-            high_score = SMALL_FONT.render(f"Highest Score: {self.highest_score}", True, (0, 0, 0))
-            screen.blit(high_score, (WIDTH//2 - high_score.get_width()//2, HEIGHT//2 + 30))
+            # Render high score as a text surface
+            high_score_text = SMALL_FONT.render(f"Highest Score: {self.highest_score}", True, (0, 0, 0))
+            screen.blit(high_score_text, (WIDTH//2 - high_score_text.get_width()//2, HEIGHT//2 + 30))
             
             restart = SMALL_FONT.render("Press 'R' to play again or ESC for menu", True, (0, 0, 0))
             screen.blit(restart, (WIDTH//2 - restart.get_width()//2, HEIGHT//2 + 70))
