@@ -3,6 +3,8 @@ import random
 import sys
 import time
 import os
+import json
+from datetime import datetime
 
 # Initialize pygame
 pygame.init()
@@ -48,78 +50,57 @@ clock = pygame.time.Clock()
 # Load assets
 def load_assets():
     assets = {
-        "heads": [],
-        "faces": [],
-        "bodies": [],
-        "hats": []
+        'bodies': [],
+        'faces': [],
+        'hats': [],
+        'heads': []
     }
     
-    # Check if assets folder exists, if not create demo images
-    if not os.path.exists("assets"):
-        os.makedirs("assets/heads", exist_ok=True)
-        os.makedirs("assets/faces", exist_ok=True)
-        os.makedirs("assets/bodies", exist_ok=True)
-        os.makedirs("assets/hats", exist_ok=True)
-        print("Assets folders created. Please add your images to these folders.")
-        
-        # Create sample assets if they don't exist
-        create_sample_assets()
-    
-    # Load heads (3 variants)
-    for i in range(1, 4):
-        path = f"assets/heads/head{i}.png"
-        if os.path.exists(path):
-            img = pygame.image.load(path)
-            img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE))
-            assets["heads"].append({"image": img, "name": f"Head {i}"})
-    
-    # Load faces (15 variants)
-    for i in range(1, 16):
-        path = f"assets/faces/face{i}.png"
-        if os.path.exists(path):
-            img = pygame.image.load(path)
-            img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE))
-            assets["faces"].append({"image": img, "name": f"Face {i}"})
-    
-    # Load bodies (2 variants)
-    for i in range(1, 3):
-        path = f"assets/bodies/body{i}.png"
-        if os.path.exists(path):
-            img = pygame.image.load(path)
-            img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE))
-            assets["bodies"].append({"image": img, "name": f"Body {i}"})
-    
-    # Load hats (10 variants)
-    for i in range(1, 11):
-        path = f"assets/hats/hat{i}.png"
-        if os.path.exists(path):
-            img = pygame.image.load(path)
-            img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE//2))
-            assets["hats"].append({"image": img, "name": f"Hat {i}"})
-    
-    # If no assets were loaded, create colored rectangles as fallbacks
-    if len(assets["heads"]) == 0:
-        for i, color in enumerate([(255, 200, 200), (200, 255, 200), (200, 200, 255)]):
+    # Load bodies (3 files)
+    try:
+        for i in range(1, 4):
+            path = f"assets/bodies/bodie{i}.png"
+            if os.path.exists(path):
+                img = pygame.image.load(path)
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE))
+                assets["bodies"].append({"image": img, "name": f"Body {i}"})
+    except Exception as e:
+        print(f"Error loading bodies: {e}")
+        # Create default body
+        for i, color in enumerate([(255, 0, 0), (0, 255, 0), (0, 0, 255)]):
             img = pygame.Surface((CHARACTER_SIZE, CHARACTER_SIZE), pygame.SRCALPHA)
-            pygame.draw.rect(img, color, (0, 0, CHARACTER_SIZE, CHARACTER_SIZE))
-            assets["heads"].append({"image": img, "name": f"Head {i+1}"})
-    
-    if len(assets["faces"]) == 0:
+            pygame.draw.rect(img, color, (0, CHARACTER_SIZE//2, CHARACTER_SIZE, CHARACTER_SIZE//2))
+            assets["bodies"].append({"image": img, "name": f"Body {i+1}"})
+
+    # Load faces (15 files)
+    try:
+        for i in range(1, 16):
+            path = f"assets/faces/face{i}.png"
+            if os.path.exists(path):
+                img = pygame.image.load(path)
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE))
+                assets["faces"].append({"image": img, "name": f"Face {i}"})
+    except Exception as e:
+        print(f"Error loading faces: {e}")
+        # Create default faces
         for i in range(15):
             img = pygame.Surface((CHARACTER_SIZE, CHARACTER_SIZE), pygame.SRCALPHA)
-            # Draw a simple face
             pygame.draw.circle(img, (0, 0, 0), (CHARACTER_SIZE//4, CHARACTER_SIZE//3), 3)
             pygame.draw.circle(img, (0, 0, 0), (CHARACTER_SIZE*3//4, CHARACTER_SIZE//3), 3)
             pygame.draw.arc(img, (0, 0, 0), (CHARACTER_SIZE//4, CHARACTER_SIZE//2, CHARACTER_SIZE//2, CHARACTER_SIZE//3), 0, 3.14, 2)
             assets["faces"].append({"image": img, "name": f"Face {i+1}"})
-    
-    if len(assets["bodies"]) == 0:
-        for i, color in enumerate([(255, 0, 0), (0, 0, 255)]):
-            img = pygame.Surface((CHARACTER_SIZE, CHARACTER_SIZE), pygame.SRCALPHA)
-            pygame.draw.rect(img, color, (0, CHARACTER_SIZE//2, CHARACTER_SIZE, CHARACTER_SIZE//2))
-            assets["bodies"].append({"image": img, "name": f"Body {i+1}"})
-    
-    if len(assets["hats"]) == 0:
+
+    # Load hats (10 files)
+    try:
+        for i in range(1, 11):
+            path = f"assets/hats/hat{i}.png"
+            if os.path.exists(path):
+                img = pygame.image.load(path)
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE//2))
+                assets["hats"].append({"image": img, "name": f"Hat {i}"})
+    except Exception as e:
+        print(f"Error loading hats: {e}")
+        # Create default hats
         for i in range(10):
             img = pygame.Surface((CHARACTER_SIZE, CHARACTER_SIZE//2), pygame.SRCALPHA)
             color = (random.randint(50, 250), random.randint(50, 250), random.randint(50, 250))
@@ -129,17 +110,33 @@ def load_assets():
             elif i % 3 == 1:  # Cap
                 pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, 10))
                 pygame.draw.polygon(img, color, [(CHARACTER_SIZE//4, CHARACTER_SIZE//4), 
-                                                (CHARACTER_SIZE*3//4, CHARACTER_SIZE//4), 
-                                                (CHARACTER_SIZE//2, 0)])
+                                            (CHARACTER_SIZE*3//4, CHARACTER_SIZE//4), 
+                                            (CHARACTER_SIZE//2, 0)])
             else:  # Crown
                 pygame.draw.rect(img, color, (CHARACTER_SIZE//4, CHARACTER_SIZE//4, CHARACTER_SIZE//2, 10))
                 pygame.draw.polygon(img, color, [(CHARACTER_SIZE//4, CHARACTER_SIZE//4), 
-                                                (CHARACTER_SIZE//3, 0), 
-                                                (CHARACTER_SIZE//2, CHARACTER_SIZE//4), 
-                                                (CHARACTER_SIZE*2//3, 0), 
-                                                (CHARACTER_SIZE*3//4, CHARACTER_SIZE//4)])
+                                            (CHARACTER_SIZE//3, 0), 
+                                            (CHARACTER_SIZE//2, CHARACTER_SIZE//4), 
+                                            (CHARACTER_SIZE*2//3, 0), 
+                                            (CHARACTER_SIZE*3//4, CHARACTER_SIZE//4)])
             assets["hats"].append({"image": img, "name": f"Hat {i+1}"})
-    
+
+    # Load heads (3 files)
+    try:
+        for i in range(1, 4):
+            path = f"assets/heads/head{i}.png"
+            if os.path.exists(path):
+                img = pygame.image.load(path)
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, CHARACTER_SIZE))
+                assets["heads"].append({"image": img, "name": f"Head {i}"})
+    except Exception as e:
+        print(f"Error loading heads: {e}")
+        # Create default heads
+        for i, color in enumerate([(255, 200, 200), (200, 255, 200), (200, 200, 255)]):
+            img = pygame.Surface((CHARACTER_SIZE, CHARACTER_SIZE), pygame.SRCALPHA)
+            pygame.draw.rect(img, color, (0, 0, CHARACTER_SIZE, CHARACTER_SIZE))
+            assets["heads"].append({"image": img, "name": f"Head {i+1}"})
+
     return assets
 
 def create_sample_assets():
@@ -342,6 +339,56 @@ class Escalator:
                 return character
         return None
 
+class GameDataCollector:
+    def __init__(self):
+        self.current_session = {
+            "session_id": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            "game_mode": None,
+            "trials": [],
+            "mouse_tracking": []
+        }
+        self.current_trial = None
+        self.target_spawn_time = None
+    
+    def start_new_trial(self, game_mode):
+        self.current_session["game_mode"] = game_mode
+        self.current_trial = {
+            "trial_start_time": time.time(),
+            "target_character": None,
+            "target_spawn_time": None,
+            "selection_time": None,
+            "success": False,
+            "reaction_time": None
+        }
+    
+    def record_target_spawn(self, character_traits):
+        if self.current_trial:
+            self.current_trial["target_character"] = character_traits
+            self.current_trial["target_spawn_time"] = time.time()
+            self.target_spawn_time = time.time()
+    
+    def record_mouse_position(self, mouse_pos, game_state):
+        self.current_session["mouse_tracking"].append({
+            "timestamp": time.time(),
+            "x": mouse_pos[0],
+            "y": mouse_pos[1],
+            "game_state": game_state
+        })
+    
+    def record_selection(self, success):
+        if self.current_trial and self.target_spawn_time:
+            selection_time = time.time()
+            self.current_trial["selection_time"] = selection_time
+            self.current_trial["success"] = success
+            self.current_trial["reaction_time"] = selection_time - self.target_spawn_time
+            self.current_session["trials"].append(self.current_trial)
+            self.current_trial = None
+    
+    def save_session_data(self):
+        filename = f"game_data_{self.current_session['session_id']}.json"
+        with open(filename, 'w') as f:
+            json.dump(self.current_session, f, indent=2)
+
 class Game:
     def __init__(self):
         self.escalators = []
@@ -363,6 +410,7 @@ class Game:
         self.target_spawned_time = 0
         self.character_factory = CharacterFactory(CHARACTER_ASSETS)
         self.time_bonus = 5  # Time added for correct clicks in infinite mode
+        self.data_collector = GameDataCollector()
         
         # Create buttons for menu
         button_width, button_height = 200, 50
@@ -419,6 +467,7 @@ class Game:
     
     def handle_events(self):
         mouse_pos = pygame.mouse.get_pos()
+        self.data_collector.record_mouse_position(mouse_pos, self.game_state)
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -458,6 +507,7 @@ class Game:
                             if clicked_character.traits == self.target_traits:
                                 # Correct character clicked
                                 self.score += 1
+                                self.data_collector.record_selection(True)
                                 if self.game_mode == GAME_MODE_SINGLE:
                                     # In single mode, finding the character once ends the game with success
                                     self.game_state = GAME_STATE_SUCCESS
@@ -474,6 +524,7 @@ class Game:
                                         self.has_target_spawned = False
                             else:
                                 # Wrong character clicked
+                                self.data_collector.record_selection(False)
                                 self.game_state = GAME_STATE_FAILURE
                             break
         
@@ -494,6 +545,7 @@ class Game:
         self.has_target_spawned = False
         self.target_spawn_count = 0
         self.score = 0
+        self.data_collector.start_new_trial(self.game_mode)
     
     def spawn_character(self, target=False):
         # Choose a random escalator
@@ -507,6 +559,7 @@ class Game:
             self.has_target_spawned = True
             self.target_spawned_time = time.time()
             self.target_spawn_count += 1
+            self.data_collector.record_target_spawn(self.target_traits)
         else:
             # Create a random character (ensure it's not the same as target)
             while True:
@@ -703,6 +756,7 @@ class Game:
             self.update()
             self.draw()
             clock.tick(60)  # 60 FPS
+        self.data_collector.save_session_data()
 
 # Main function
 def main():
