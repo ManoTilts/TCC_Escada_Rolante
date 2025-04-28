@@ -1,1 +1,6 @@
 pygame
+pandas
+matplotlib
+seaborn
+jsonschema
+pytest
