@@ -27,6 +27,7 @@ GAME_STATE_DISPLAY_TARGET = 1
 GAME_STATE_PLAYING = 2
 GAME_STATE_SUCCESS = 3
 GAME_STATE_FAILURE = 4
+GAME_STATE_USER_INPUT = 5  # New state for user identification
 
 # Modos de jogo
 GAME_MODE_SINGLE = 0  # Alvo aparece uma vez
@@ -324,16 +325,76 @@ class Escalator:
                 return character
         return None
 
+class TextInput:
+    def __init__(self, x, y, width, height, font=None, placeholder="Enter your name"):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = ""
+        self.active = True
+        self.placeholder = placeholder
+        self.font = font or SMALL_FONT
+        self.color_inactive = pygame.Color('gray')
+        self.color_active = pygame.Color('black')
+        self.color = self.color_active if self.active else self.color_inactive
+        self.cursor_visible = True
+        self.cursor_timer = 0
+        self.cursor_blink_rate = 0.5  # seconds
+    
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if self.active:
+                if event.key == pygame.K_RETURN:
+                    return self.text  # Submit text on Enter
+                elif event.key == pygame.K_BACKSPACE:
+                    self.text = self.text[:-1]
+                else:
+                    # Only add printable characters
+                    if event.unicode.isprintable():
+                        self.text += event.unicode
+        return None
+    
+    def update(self):
+        # Blink cursor
+        self.cursor_timer += 1/60  # Assuming 60 FPS
+        if self.cursor_timer >= self.cursor_blink_rate:
+            self.cursor_visible = not self.cursor_visible
+            self.cursor_timer = 0
+    
+    def draw(self, screen):
+        # Draw text field background
+        pygame.draw.rect(screen, (255, 255, 255), self.rect)  # White background
+        pygame.draw.rect(screen, self.color, self.rect, 2)  # Border
+        
+        # Render text or placeholder
+        if self.text:
+            text_surf = self.font.render(self.text, True, self.color)
+        else:
+            text_surf = self.font.render(self.placeholder, True, self.color_inactive)
+        
+        # Blit text surface
+        text_rect = text_surf.get_rect(midleft=(self.rect.x + 5, self.rect.centery))
+        screen.blit(text_surf, text_rect)
+        
+        # Draw cursor
+        if self.active and self.cursor_visible and len(self.text) < 30:  # Limit text length
+            cursor_x = text_rect.right + 2 if self.text else self.rect.x + 5
+            pygame.draw.line(screen, self.color, 
+                           (cursor_x, self.rect.y + 5), 
+                           (cursor_x, self.rect.bottom - 5), 2)
+
 class GameDataCollector:
     def __init__(self):
         self.current_session = {
             "session_id": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            "username": "Anonymous",  # Default username
             "game_mode": None,
             "trials": [],
             "mouse_tracking": []
         }
         self.current_trial = None
         self.target_spawn_time = None
+    
+    def set_username(self, username):
+        self.current_session["username"] = username if username else "Anonymous"
     
     def start_new_trial(self, game_mode):
         self.current_session["game_mode"] = game_mode
@@ -391,6 +452,7 @@ class GameDataCollector:
         # Create a copy of the session data without non-serializable objects
         serializable_session = {
             "session_id": self.current_session["session_id"],
+            "username": self.current_session["username"],  # Include username in the saved data
             "game_mode": self.current_session["game_mode"],
             "trials": []
         }
@@ -426,7 +488,7 @@ class Game:
         self.escalators = []
         self.spawn_counter = 0
         self.running = True
-        self.game_state = GAME_STATE_MENU
+        self.game_state = GAME_STATE_USER_INPUT  # Start with user input state
         self.game_mode = GAME_MODE_SINGLE
         self.target_character = None
         self.target_traits = None
@@ -443,6 +505,20 @@ class Game:
         self.character_factory = CharacterFactory(CHARACTER_ASSETS)
         self.time_bonus = 5  # Time added for correct clicks in infinite mode
         self.data_collector = GameDataCollector()
+        
+        # Create text input for user name
+        self.text_input = TextInput(
+            WIDTH//2 - 150, HEIGHT//2,
+            300, 40, 
+            placeholder="Enter your name"
+        )
+        
+        # Create confirm button for user name
+        self.confirm_button = Button(
+            WIDTH//2 - 75, HEIGHT//2 + 50,
+            150, 40,
+            "Confirm"
+        )
         
         # Create buttons for menu
         button_width, button_height = 200, 50
@@ -515,8 +591,21 @@ class Game:
                     # Restart the game
                     self.reset_game()
                     self.game_state = GAME_STATE_DISPLAY_TARGET  # Ensure it goes back to displaying the target
+                
+                # Handle text input for user identification
+                if self.game_state == GAME_STATE_USER_INPUT:
+                    result = self.text_input.handle_event(event)
+                    if result is not None:  # Enter was pressed
+                        self.data_collector.set_username(result)
+                        self.game_state = GAME_STATE_MENU
+                        
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.game_state == GAME_STATE_MENU:
+                if self.game_state == GAME_STATE_USER_INPUT:
+                    if self.confirm_button.is_clicked(mouse_pos):
+                        self.data_collector.set_username(self.text_input.text)
+                        self.game_state = GAME_STATE_MENU
+                        
+                elif self.game_state == GAME_STATE_MENU:
                     # Check if either game mode button was clicked
                     if self.single_mode_button.is_clicked(mouse_pos):
                         self.game_mode = GAME_MODE_SINGLE
@@ -565,6 +654,8 @@ class Game:
             self.single_mode_button.check_hover(mouse_pos)
             self.multiple_mode_button.check_hover(mouse_pos)
             self.infinite_mode_button.check_hover(mouse_pos)
+        elif self.game_state == GAME_STATE_USER_INPUT:
+            self.confirm_button.check_hover(mouse_pos)
     
     def reset_game(self):
         # Reset the game state
@@ -602,6 +693,9 @@ class Game:
         escalator.add_character(character)
     
     def update(self):
+        if self.game_state == GAME_STATE_USER_INPUT:
+            self.text_input.update()
+        
         current_time = time.time()
         
         # Handle game state transitions
@@ -696,7 +790,18 @@ class Game:
         # Clear the screen
         screen.fill(BACKGROUND_COLOR)
         
-        if self.game_state == GAME_STATE_MENU:
+        if self.game_state == GAME_STATE_USER_INPUT:
+            # Draw the user identification screen
+            title = TITLE_FONT.render("Player Identification", True, (50, 50, 150))
+            screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4))
+            
+            prompt = SMALL_FONT.render("Please enter your name:", True, (0, 0, 0))
+            screen.blit(prompt, (WIDTH//2 - prompt.get_width()//2, HEIGHT//2 - 40))
+            
+            self.text_input.draw(screen)
+            self.confirm_button.draw(screen)
+            
+        elif self.game_state == GAME_STATE_MENU:
             self.draw_menu()
             
         elif self.game_state == GAME_STATE_DISPLAY_TARGET:
