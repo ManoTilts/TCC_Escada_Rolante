@@ -15,8 +15,7 @@ O jogo gera um arquivo JSON com dados detalhados sobre:
 
 #### Tarefas Pendentes:
 - Alterar o modo de multiplas escolhas e possivelmente o modo infinito, para o personagem alvo mudar a cada acerto
-- Alterar para que o jogo seja contínuo (se clicar no alvo errado o jogo não para, no modo infinito porem o jogador perde um pouco de tempo) com um placar de coleta
-- Melhorar a UI
+- Melhorar a UI 
 
 ## Visualização de Dados (python-data-viz)
 
