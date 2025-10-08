@@ -1,0 +1,10 @@
+na tela inicial colocar o nome do jogo com uma fonte de game. alterar o titulo da janela
+na tela inicial colocar instruções e jogar, e no final do jogo inserir o nome (meio como se fosse sistema de highscore)
+na parte das instruções deixar facil de entender o jogo, pique um tutorial.
+trocar a questão de memorizar em vez de lembre-se do personagem, centralize o cronometro, aumentar a fonte da palavra memorize, tirar os detalhes
+personagem, em vez de timer fazer uma barrinha de progresso na parte de cima, pique uma barra de progresso, ocultar a barrinha de precisão, tirar 
+quantos segundos ele recebera pq ja estara nas instrução, aumentar o tamanho dos personages em 33%.
+adicionar um modo alternado, onde ele tem que selecionar o personagem qye alterna a cada vez que voce acerta, trocar o modo multipla escolhga por esse.
+adicinar um modo seta onde a seta gira e aponta para um quarto da tela com cor (o que o jogador devera escolher é o quartante que tenha a mesma cor da SETA não onde ela ta apontando)
+
+tomar como ref https://play.google.com/store/search?q=jogos%20de%20coordena%C3%A7%C3%A3o&c=apps&hl=pt_BR

@@ -10,16 +10,37 @@ from datetime import datetime
 pygame.init()
 
 # variáveis de configuração do jogo
-WIDTH, HEIGHT = 1000, 800
+WIDTH, HEIGHT = 1400, 1000  # Tamanho maior para melhor visibilidade
 BACKGROUND_COLOR = (200, 200, 200)
 ESCALATOR_COLORS = [(100, 100, 100), (120, 120, 120), (140, 140, 140)]
+
+# Cores do tema do jogo
+GAME_BLUE = (30, 60, 120)
+GAME_LIGHT_BLUE = (60, 120, 200)
+GAME_GOLD = (255, 215, 0)
+GAME_SILVER = (192, 192, 192)
+GAME_WHITE = (255, 255, 255)
+GAME_BLACK = (0, 0, 0)
+GAME_GREEN = (0, 180, 0)
+GAME_RED = (220, 30, 30)
+
+# Cores dos quadrantes para o modo seta
+QUADRANT_COLORS = [
+    (255, 100, 100),  # Vermelho claro - Superior esquerdo
+    (100, 255, 100),  # Verde claro - Superior direito  
+    (100, 100, 255),  # Azul claro - Inferior esquerdo
+    (255, 255, 100)   # Amarelo claro - Inferior direito
+]
 ESCALATOR_SPEEDS = [2, 3, 4]  # velocidades diferentes para cada escada
-ESCALATOR_WIDTH = 120
-ESCALATOR_SPACING = 100
-ESCALATOR_START_X = 170  # posição inicial da primeira escada
+ESCALATOR_WIDTH = 150  # Largura maior das escadas
+ESCALATOR_SPACING = 100  # Espaçamento entre escadas
+# Cálculo para centralizar as 3 escadas na tela
+# Total de largura ocupada: 3 * ESCALATOR_WIDTH + 2 * ESCALATOR_SPACING
+TOTAL_ESCALATORS_WIDTH = 3 * ESCALATOR_WIDTH + 2 * ESCALATOR_SPACING
+ESCALATOR_START_X = (WIDTH - TOTAL_ESCALATORS_WIDTH) // 2  # Centraliza o conjunto
 
 # propriedades do personagem
-CHARACTER_SIZE = 75  # Tamanho total do personagem (3 * 25px)
+CHARACTER_SIZE = 120  # Tamanho total do personagem aumentado para melhor visibilidade
 
 # Estados do jogo
 GAME_STATE_MENU = 0
@@ -28,24 +49,53 @@ GAME_STATE_PLAYING = 2
 GAME_STATE_SUCCESS = 3
 GAME_STATE_FAILURE = 4
 GAME_STATE_USER_INPUT = 5  # Novo estado para identificação do usuário
+GAME_STATE_NAME_INPUT = 6  # Estado para inserir nome após o jogo
+GAME_STATE_HIGHSCORE = 7  # Estado para mostrar highscore
+GAME_STATE_INSTRUCTIONS = 8  # Estado para mostrar instruções
+GAME_STATE_CONFIRM_PLAYER = 9  # Estado para confirmar se é o mesmo jogador
 
 # Modos de jogo
 GAME_MODE_SINGLE = 0  # Alvo aparece uma vez
-GAME_MODE_MULTIPLE = 1  # Alvo aparece várias vezes
+GAME_MODE_ALTERNATING = 1  # Alvo alterna a cada acerto
 GAME_MODE_INFINITE = 2  # Infinito, o jogador ganha tempo ao clicar em personagens
+GAME_MODE_ARROW = 3  # Modo da seta girando apontando para quadrantes coloridos
 
 # Taxa de aparição de personagens
 CHARACTER_SPAWN_RATE = 60  # Frames entre aparições de personagens
 
-# Fontes
-FONT = pygame.font.SysFont('Arial', 36)
-SMALL_FONT = pygame.font.SysFont('Arial', 24)
-TINY_FONT = pygame.font.SysFont('Arial', 16)
-TITLE_FONT = pygame.font.SysFont('Arial', 48, bold=True)
+# Fontes - aumentadas para tela maior
+FONT = pygame.font.SysFont('Arial', 42)
+SMALL_FONT = pygame.font.SysFont('Arial', 28)
+TINY_FONT = pygame.font.SysFont('Arial', 20)
+TITLE_FONT = pygame.font.SysFont('Arial', 56, bold=True)
+
+# Fontes para estilo de jogo
+try:
+    # Tenta carregar fontes mais game-like - aumentadas para tela maior
+    GAME_TITLE_FONT = pygame.font.SysFont('Trebuchet MS', 72, bold=True)
+    GAME_SUBTITLE_FONT = pygame.font.SysFont('Trebuchet MS', 38, bold=True)
+    MENU_FONT = pygame.font.SysFont('Trebuchet MS', 24)
+    BUTTON_FONT = pygame.font.SysFont('Trebuchet MS', 28, bold=True)
+    # Fontes maiores e mais grossas para instruções e highscore
+    INSTRUCTIONS_TITLE_FONT = pygame.font.SysFont('Trebuchet MS', 64, bold=True)
+    INSTRUCTIONS_TEXT_FONT = pygame.font.SysFont('Trebuchet MS', 34, bold=True)
+    HIGHSCORE_TITLE_FONT = pygame.font.SysFont('Trebuchet MS', 64, bold=True)
+    HIGHSCORE_TEXT_FONT = pygame.font.SysFont('Trebuchet MS', 36, bold=True)
+except:
+    # Fallback para fontes padrão se as acima não estiverem disponíveis
+    GAME_TITLE_FONT = pygame.font.SysFont('Arial', 72, bold=True)
+    GAME_SUBTITLE_FONT = pygame.font.SysFont('Arial', 38, bold=True)
+    MENU_FONT = pygame.font.SysFont('Arial', 24)
+    BUTTON_FONT = pygame.font.SysFont('Arial', 28, bold=True)
+    # Fontes maiores e mais grossas para instruções e highscore
+    INSTRUCTIONS_TITLE_FONT = pygame.font.SysFont('Arial', 64, bold=True)
+    INSTRUCTIONS_TEXT_FONT = pygame.font.SysFont('Arial', 34, bold=True)
+    HIGHSCORE_TITLE_FONT = pygame.font.SysFont('Arial', 64, bold=True)
+    HIGHSCORE_TEXT_FONT = pygame.font.SysFont('Arial', 36, bold=True)
 
 # Inicializa a tela
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Jogo da Memória na Escada Rolante")
+pygame.display.set_caption("Memory Escalator - Jogo da Memória na Escada Rolante")
 clock = pygame.time.Clock()
 
 # Carrega recursos
@@ -57,20 +107,23 @@ def load_assets():
         'heads': []
     }
     
+    # Calcula o tamanho de cada segmento baseado no CHARACTER_SIZE atual
+    segment_size = CHARACTER_SIZE // 3  # Cada parte do personagem
+    
     # Carrega corpos (3 arquivos possíveis)
     try:
         for i in range(1, 4):
             path = f"assets/bodies/bodie{i}.png"
             if os.path.exists(path):
                 img = pygame.image.load(path)
-                img = pygame.transform.scale(img, (50, 25))  # 50x25 pixels
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, segment_size))  # Escala proporcional
                 assets["bodies"].append({"image": img, "name": f"Corpo {i}"})
     except Exception as e:
         print(f"Erro ao carregar corpos: {e}")
         # Cria corpo padrão se não houver arquivos
         for i, color in enumerate([(255, 0, 0), (0, 255, 0), (0, 0, 255)]):
-            img = pygame.Surface((50, 25), pygame.SRCALPHA)
-            pygame.draw.rect(img, color, (0, 0, 50, 25))
+            img = pygame.Surface((CHARACTER_SIZE, segment_size), pygame.SRCALPHA)
+            pygame.draw.rect(img, color, (0, 0, CHARACTER_SIZE, segment_size))
             assets["bodies"].append({"image": img, "name": f"Corpo {i+1}"})
 
     # Carrega rostos (15 arquivos possíveis)
@@ -79,15 +132,19 @@ def load_assets():
             path = f"assets/faces/face{i}.png"
             if os.path.exists(path):
                 img = pygame.image.load(path)
-                img = pygame.transform.scale(img, (50, 25))  # 50x25 pixels
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, segment_size))  # Escala proporcional
                 assets["faces"].append({"image": img, "name": f"Rosto {i}"})
     except Exception as e:
         print(f"Erro ao carregar rostos: {e}")
         # Cria rosto padrão se não houver arquivos
         for i in range(15):
-            img = pygame.Surface((50, 25), pygame.SRCALPHA)
-            pygame.draw.circle(img, (0, 0, 0), (12, 12), 3)
-            pygame.draw.circle(img, (0, 0, 0), (38, 12), 3)
+            img = pygame.Surface((CHARACTER_SIZE, segment_size), pygame.SRCALPHA)
+            # Ajusta proporcionalmente os olhos
+            eye_radius = segment_size // 8
+            eye1_x, eye1_y = CHARACTER_SIZE // 4, segment_size // 2
+            eye2_x, eye2_y = 3 * CHARACTER_SIZE // 4, segment_size // 2
+            pygame.draw.circle(img, (0, 0, 0), (eye1_x, eye1_y), eye_radius)
+            pygame.draw.circle(img, (0, 0, 0), (eye2_x, eye2_y), eye_radius)
             assets["faces"].append({"image": img, "name": f"Rosto {i+1}"})
 
     # Carrega chapéus (10 arquivos)
@@ -96,15 +153,20 @@ def load_assets():
             path = f"assets/hats/hat{i}.png"
             if os.path.exists(path):
                 img = pygame.image.load(path)
-                img = pygame.transform.scale(img, (50, 25))  # 50x25 pixels
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, segment_size))  # Escala proporcional
                 assets["hats"].append({"image": img, "name": f"Chapéu {i}"})
     except Exception as e:
         print(f"Erro ao carregar chapéus: {e}")
         # Cria chapéu padrão se não houver arquivos
         for i in range(10):
-            img = pygame.Surface((50, 25), pygame.SRCALPHA)
+            img = pygame.Surface((CHARACTER_SIZE, segment_size), pygame.SRCALPHA)
             color = (random.randint(50, 250), random.randint(50, 250), random.randint(50, 250))
-            pygame.draw.rect(img, color, (10, 10, 30, 15))
+            # Ajusta proporcionalmente o desenho do chapéu
+            hat_width = CHARACTER_SIZE * 3 // 4
+            hat_height = segment_size * 3 // 4
+            hat_x = (CHARACTER_SIZE - hat_width) // 2
+            hat_y = (segment_size - hat_height) // 2
+            pygame.draw.rect(img, color, (hat_x, hat_y, hat_width, hat_height))
             assets["hats"].append({"image": img, "name": f"Chapéu {i+1}"})
 
     # Carrega cabeças (3 arquivos)
@@ -113,14 +175,14 @@ def load_assets():
             path = f"assets/heads/head{i}.png"
             if os.path.exists(path):
                 img = pygame.image.load(path)
-                img = pygame.transform.scale(img, (50, 25))  # 50x25 pixels
+                img = pygame.transform.scale(img, (CHARACTER_SIZE, segment_size))  # Escala proporcional
                 assets["heads"].append({"image": img, "name": f"Cabeça {i}"})
     except Exception as e:
         print(f"Erro ao carregar cabeças: {e}")
         # Cria cabeça padrão se não houver arquivos
         for i, color in enumerate([(255, 200, 200), (200, 255, 200), (200, 200, 255)]):
-            img = pygame.Surface((50, 25), pygame.SRCALPHA)
-            pygame.draw.rect(img, color, (0, 0, 50, 25))
+            img = pygame.Surface((CHARACTER_SIZE, segment_size), pygame.SRCALPHA)
+            pygame.draw.rect(img, color, (0, 0, CHARACTER_SIZE, segment_size))
             assets["heads"].append({"image": img, "name": f"Cabeça {i+1}"})
 
     return assets
@@ -159,23 +221,24 @@ class Character:
         self.x = escalator.x + (escalator.width - self.size) // 2
     
     def draw(self, screen):
-        total_height = 75  # Altura total do personagem (3 * 25px)
+        # Calcula as posições baseado no tamanho atual do personagem
+        segment_height = self.size // 3  # Divide em 3 partes iguais
         
         # Desenha o corpo na parte inferior
         screen.blit(self.traits["body"]["image"], 
-                    (self.x, self.y + 50))  # 25px inferiores
+                    (self.x, self.y + segment_height * 2))  # Parte inferior
         
         # Desenha a cabeça no meio
         screen.blit(self.traits["head"]["image"], 
-                    (self.x, self.y + 25))  # 25px do meio
+                    (self.x, self.y + segment_height))  # Parte do meio
         
         # Desenha o rosto sobre a cabeça (mesma posição da cabeça pois é uma sobreposição)
         screen.blit(self.traits["face"]["image"], 
-                    (self.x, self.y + 25))  # Sobrepõe na cabeça
+                    (self.x, self.y + segment_height))  # Sobrepõe na cabeça
         
         # Desenha o chapéu no topo
         screen.blit(self.traits["hat"]["image"], 
-                    (self.x, self.y))  # 25px do topo
+                    (self.x, self.y))  # Parte do topo
     
     def is_clicked(self, mouse_pos):
         # Verifica se este personagem foi clicado
@@ -248,22 +311,49 @@ class CharacterFactory:
         return character.traits.copy()
 
 class Button:
-    def __init__(self, x, y, width, height, text, color=(100, 100, 200), hover_color=(150, 150, 250)):
+    def __init__(self, x, y, width, height, text, color=None, hover_color=None):
+        if color is None:
+            color = (50, 100, 180)  # Azul amigável
+        if hover_color is None:
+            hover_color = (70, 130, 200)  # Azul mais claro para hover
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
         self.color = color
         self.hover_color = hover_color
         self.is_hovered = False
-        self.font = pygame.font.SysFont('Arial', 24)
+        self.font = BUTTON_FONT
     
     def draw(self, screen):
-        # Desenha o botão
-        color = self.hover_color if self.is_hovered else self.color
-        pygame.draw.rect(screen, color, self.rect)
-        pygame.draw.rect(screen, (0, 0, 0), self.rect, 2)  # Borda
+        # Cores simples e amigáveis
+        if self.is_hovered:
+            button_color = (70, 130, 200)  # Azul mais claro no hover
+            border_color = (255, 255, 255)
+            text_color = (255, 255, 255)
+        else:
+            button_color = (50, 100, 180)  # Azul padrão
+            border_color = (200, 200, 200)
+            text_color = (255, 255, 255)
         
-        # Desenha o texto
-        text_surf = self.font.render(self.text, True, (255, 255, 255))
+        # Fundo do botão simples
+        pygame.draw.rect(screen, button_color, self.rect)
+        pygame.draw.rect(screen, button_color, self.rect, border_radius=8)
+        
+        # Borda simples
+        pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=8)
+        
+        # Efeito sutil de luz no topo para dar volume
+        if self.rect.height > 10:
+            light_rect = pygame.Rect(self.rect.x + 2, self.rect.y + 2, self.rect.width - 4, 2)
+            pygame.draw.rect(screen, (255, 255, 255, 60), light_rect, border_radius=6)
+        
+        # Texto com sombra sutil
+        # Sombra
+        text_shadow = self.font.render(self.text, True, (0, 0, 0, 120))
+        shadow_rect = text_shadow.get_rect(center=(self.rect.centerx + 1, self.rect.centery + 1))
+        screen.blit(text_shadow, shadow_rect)
+        
+        # Texto principal
+        text_surf = self.font.render(self.text, True, text_color)
         text_rect = text_surf.get_rect(center=self.rect.center)
         screen.blit(text_surf, text_rect)
     
@@ -359,18 +449,21 @@ class TextInput:
             self.cursor_timer = 0
     
     def draw(self, screen):
-        # Desenha o fundo do campo de texto
-        pygame.draw.rect(screen, (255, 255, 255), self.rect)  # Fundo branco
-        pygame.draw.rect(screen, self.color, self.rect, 2)  # Borda
+        # Fundo do campo de texto com bordas arredondadas
+        pygame.draw.rect(screen, (255, 255, 255), self.rect, border_radius=8)
+        
+        # Borda colorida
+        border_color = (70, 130, 200) if self.active else (150, 150, 150)
+        pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=8)
         
         # Renderiza o texto ou o placeholder
         if self.text:
-            text_surf = self.font.render(self.text, True, self.color)
+            text_surf = self.font.render(self.text, True, (50, 50, 50))
         else:
-            text_surf = self.font.render(self.placeholder, True, self.color_inactive)
+            text_surf = self.font.render(self.placeholder, True, (150, 150, 150))
         
         # Desenha a superfície do texto
-        text_rect = text_surf.get_rect(midleft=(self.rect.x + 5, self.rect.centery))
+        text_rect = text_surf.get_rect(midleft=(self.rect.x + 10, self.rect.centery))
         screen.blit(text_surf, text_rect)
         
         # Desenha o cursor
@@ -458,6 +551,11 @@ class GameDataCollector:
             "reaction_time": None,
             "score": 0  # Inicializa a pontuação para esta tentativa
         }
+        
+        # Para o modo seta, já define o target_spawn_time como agora
+        # pois o alvo (quadrante colorido) está sempre visível
+        if game_mode == 3:  # GAME_MODE_ARROW
+            self.current_trial["target_spawn_time"] = time.time()
     
     def update_trial_score(self, score):
         if self.current_trial:
@@ -490,6 +588,28 @@ class GameDataCollector:
             self.current_trial["selection_time"] = selection_time
             self.current_trial["success"] = success
             self.current_trial["reaction_time"] = selection_time - self.target_spawn_time
+            self.current_session["trials"].append(self.current_trial)
+            self.current_trial = None
+    
+    def record_arrow_selection(self, success, clicked_quadrant, target_quadrant, arrow_angle, arrow_speed, arrow_in_zone):
+        """Registra uma seleção específica do modo seta com métricas detalhadas"""
+        if self.current_trial:
+            selection_time = time.time()
+            self.current_trial["selection_time"] = selection_time
+            self.current_trial["success"] = success
+            self.current_trial["reaction_time"] = selection_time - self.current_trial["trial_start_time"]
+            
+            # Métricas específicas do modo seta
+            self.current_trial["arrow_metrics"] = {
+                "clicked_quadrant": clicked_quadrant,
+                "target_quadrant": target_quadrant,
+                "arrow_angle_at_click": arrow_angle,
+                "arrow_rotation_speed": arrow_speed,
+                "arrow_in_target_zone": arrow_in_zone,
+                "timing_accuracy": "perfect" if arrow_in_zone else "missed_timing",
+                "quadrant_accuracy": "correct" if clicked_quadrant == target_quadrant else "wrong_quadrant"
+            }
+            
             self.current_session["trials"].append(self.current_trial)
             self.current_trial = None
     
@@ -571,11 +691,12 @@ class Game:
         self.escalators = []
         self.spawn_counter = 0
         self.running = True
-        self.game_state = GAME_STATE_USER_INPUT  # Começa com estado de entrada do usuário
+        self.game_state = GAME_STATE_MENU  # Começa no menu principal
         self.game_mode = GAME_MODE_SINGLE
         self.target_character = None
         self.target_traits = None
         self.display_target_time = 4  # segundos para exibir o alvo
+        self.is_first_target = True  # Para controlar se é o primeiro alvo ou não
         self.target_display_start = 0
         self.score = 0
         self.highest_score = 0
@@ -592,22 +713,63 @@ class Game:
         self.selections_total = 0
         self.selections_correct = 0
         
-        # Cria entrada de texto para nome do usuário
+        # Variáveis específicas do modo seta
+        self.arrow_angle = 0  # Ângulo atual da seta
+        self.arrow_rotation_speed = 4.0  # Velocidade de rotação da seta (varia de 2 a 8)
+        self.target_quadrant = 0  # Quadrante alvo (0-3)
+        self.arrow_color = (255, 255, 255)  # Cor da seta (será definida pelo quadrante alvo)
+        self.arrow_in_target_zone = False  # Se a seta está no quadrante certo
+        self.last_quadrant_pointed = -1  # Último quadrante que a seta apontou
+        
+        # Sistema de highscore
+        self.highscores = self.load_highscores()
+        self.last_score = 0
+        self.is_new_highscore = False
+        self.player_name = ""
+        
+        # Cria entrada de texto para nome do usuário - maior para tela maior
         self.text_input = TextInput(
-            WIDTH//2 - 150, HEIGHT//2,
-            300, 40, 
+            WIDTH//2 - 200, HEIGHT//2,
+            400, 50, 
             placeholder="Digite seu nome"
         )
         
         # Cria botão de confirmação para nome do usuário
         self.confirm_button = Button(
-            WIDTH//2 - 75, HEIGHT//2 + 50,
-            150, 40,
+            WIDTH//2 - 100, HEIGHT//2 + 60,
+            200, 50,
             "Confirmar"
         )
         
-        # Cria botões para o menu
-        button_width, button_height = 200, 50
+        # Entrada de texto para highscore
+        self.highscore_input = TextInput(
+            WIDTH//2 - 200, HEIGHT//2 + 50,
+            400, 50,
+            placeholder="Digite seu nome para o ranking"
+        )
+        
+        # Botão de confirmação para highscore
+        self.highscore_confirm_button = Button(
+            WIDTH//2 - 100, HEIGHT//2 + 120,
+            200, 50,
+            "Salvar"
+        )
+        
+        # Botões para confirmação de jogador
+        self.yes_button = Button(
+            WIDTH//2 - 210, HEIGHT//2 + 60,
+            160, 50,
+            "Sim"
+        )
+        
+        self.no_button = Button(
+            WIDTH//2 + 50, HEIGHT//2 + 60,
+            160, 50,
+            "Não"
+        )
+        
+        # Cria botões para o menu - tamanhos maiores para tela maior
+        button_width, button_height = 280, 60
         button_x = WIDTH // 2 - button_width // 2
         
         self.single_mode_button = Button(
@@ -616,10 +778,10 @@ class Game:
             "Modo Aparição Única"
         )
         
-        self.multiple_mode_button = Button(
+        self.alternating_mode_button = Button(
             button_x, HEIGHT // 2, 
             button_width, button_height, 
-            "Modo Múltiplas Aparições"
+            "Modo Alternado"
         )
         
         self.infinite_mode_button = Button(
@@ -628,25 +790,125 @@ class Game:
             "Modo Infinito"
         )
         
+        self.arrow_mode_button = Button(
+            button_x, HEIGHT // 2 + 140, 
+            button_width, button_height, 
+            "Modo Seta Colorida"
+        )
+        
+        # Botões adicionais do menu
+        self.instructions_button = Button(
+            button_x, HEIGHT // 2 + 210,
+            button_width, button_height,
+            "Como Jogar"
+        )
+        
+        self.highscore_button = Button(
+            button_x, HEIGHT // 2 + 280,
+            button_width, button_height,
+            "Melhores Pontuações"
+        )
+        
+        self.back_button = Button(
+            50, HEIGHT - 100,
+            160, 50,
+            "Voltar"
+        )
+        
         # Cria as três escadas rolantes
         for i in range(3):
             x = ESCALATOR_START_X + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
             escalator = Escalator(x, ESCALATOR_WIDTH, ESCALATOR_SPEEDS[i], ESCALATOR_COLORS[i])
             self.escalators.append(escalator)
         
-        # Carrega imagem de fundo do menu
-        self.menu_image = self.load_menu_image()
+        # Remove dependência de imagem - usaremos design programático
+        # self.menu_image = self.load_menu_image()
     
-    def load_menu_image(self):
-        if os.path.exists("assets/misc/menu.png"):
-            try:
-                return pygame.image.load("assets/misc/menu.png")
-            except pygame.error:
-                print("Imagem do menu encontrada mas não pôde ser carregada, usando menu padrão.")
-                return False
-        else:
-            print("Imagem do menu não encontrada, usando menu padrão.")
+    def load_highscores(self):
+        """Carrega os highscores do arquivo"""
+        try:
+            highscore_path = os.path.join("playerdata", "highscore", "highscores.json")
+            if os.path.exists(highscore_path):
+                with open(highscore_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                return {"single": [], "alternating": [], "infinite": [], "arrow": []}
+        except:
+            return {"single": [], "alternating": [], "infinite": [], "arrow": []}
+    
+    def add_highscore(self, name, score, mode):
+        """Adiciona uma nova pontuação ao ranking - APENAS para modos INFINITE e ARROW"""
+        # Só salva no highscore se for modo INFINITE ou ARROW
+        if mode != GAME_MODE_INFINITE and mode != GAME_MODE_ARROW:
+            return
+            
+        mode_names = {
+            GAME_MODE_SINGLE: "single",
+            GAME_MODE_ALTERNATING: "alternating", 
+            GAME_MODE_INFINITE: "infinite",
+            GAME_MODE_ARROW: "arrow"
+        }
+        
+        mode_key = mode_names.get(mode, "infinite")
+        
+        # Garante que a chave existe no dicionário de highscores
+        if mode_key not in self.highscores:
+            self.highscores[mode_key] = []
+        
+        # Adiciona nova pontuação - corrige bug de nomes com espaços
+        clean_name = name.strip() if name and name.strip() else "Anônimo"
+        new_score = {
+            "name": clean_name,
+            "score": score,
+            "date": datetime.now().strftime("%d/%m/%Y %H:%M")
+        }
+        
+        self.highscores[mode_key].append(new_score)
+        
+        # Ordena por pontuação (maior primeiro) e mantém apenas top 10
+        self.highscores[mode_key].sort(key=lambda x: x["score"], reverse=True)
+        self.highscores[mode_key] = self.highscores[mode_key][:10]
+        
+        self.save_highscores()
+    
+    def is_highscore(self, score, mode):
+        """Verifica se a pontuação é um highscore - APENAS para modos INFINITE e ARROW"""
+        # Só considera highscore se for modo INFINITE ou ARROW
+        if mode != GAME_MODE_INFINITE and mode != GAME_MODE_ARROW:
             return False
+            
+        mode_names = {
+            GAME_MODE_SINGLE: "single",
+            GAME_MODE_ALTERNATING: "alternating",
+            GAME_MODE_INFINITE: "infinite",
+            GAME_MODE_ARROW: "arrow"
+        }
+        
+        mode_key = mode_names.get(mode, "infinite")
+        scores = self.highscores[mode_key]
+        
+        # Se tem menos de 10 pontuações, sempre é highscore
+        if len(scores) < 10:
+            return True
+        
+        # Se a pontuação é maior que a menor do top 10
+        return score > scores[-1]["score"]
+    
+    def save_highscores(self):
+        """Salva os highscores no arquivo"""
+        try:
+            # Cria o diretório se não existir
+            highscore_dir = os.path.join("playerdata", "highscore")
+            os.makedirs(highscore_dir, exist_ok=True)
+            
+            # Salva na pasta correta
+            highscore_path = os.path.join(highscore_dir, "highscores.json")
+            with open(highscore_path, 'w', encoding='utf-8') as f:
+                json.dump(self.highscores, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Erro ao salvar highscores: {e}")
+    
+
 
     def select_new_target(self):
         # Cria um personagem alvo (ainda não colocado em nenhuma escada rolante)
@@ -678,33 +940,42 @@ class Game:
                     self.reset_game()
                     self.game_state = GAME_STATE_DISPLAY_TARGET  # Garante que volte a exibir o alvo
                 
-                # Manipula entrada de texto para identificação do usuário
-                if self.game_state == GAME_STATE_USER_INPUT:
-                    result = self.text_input.handle_event(event)
+
+                
+                # Manipula entrada de texto para highscore
+                if self.game_state == GAME_STATE_NAME_INPUT:
+                    result = self.highscore_input.handle_event(event)
                     if result is not None:  # Enter foi pressionado
-                        self.data_collector.set_username(result)
+                        self.add_highscore(result, self.last_score, self.game_mode)
                         self.game_state = GAME_STATE_MENU
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.game_state == GAME_STATE_USER_INPUT:
-                    if self.confirm_button.is_clicked(mouse_pos):
-                        self.data_collector.set_username(self.text_input.text)
-                        self.game_state = GAME_STATE_MENU
-                        
-                elif self.game_state == GAME_STATE_MENU:
+                if self.game_state == GAME_STATE_MENU:
                     # Verifica se algum botão de modo de jogo foi clicado
                     if self.single_mode_button.is_clicked(mouse_pos):
                         self.game_mode = GAME_MODE_SINGLE
                         self.reset_game()
-                        self.game_state = GAME_STATE_DISPLAY_TARGET
-                    elif self.multiple_mode_button.is_clicked(mouse_pos):
-                        self.game_mode = GAME_MODE_MULTIPLE
+                        if self.game_state != GAME_STATE_CONFIRM_PLAYER:
+                            self.game_state = GAME_STATE_DISPLAY_TARGET
+                    elif self.alternating_mode_button.is_clicked(mouse_pos):
+                        self.game_mode = GAME_MODE_ALTERNATING
                         self.reset_game()
-                        self.game_state = GAME_STATE_DISPLAY_TARGET
+                        if self.game_state != GAME_STATE_CONFIRM_PLAYER:
+                            self.game_state = GAME_STATE_DISPLAY_TARGET
                     elif self.infinite_mode_button.is_clicked(mouse_pos):
                         self.game_mode = GAME_MODE_INFINITE
                         self.reset_game()
-                        self.game_state = GAME_STATE_DISPLAY_TARGET
+                        if self.game_state != GAME_STATE_CONFIRM_PLAYER:
+                            self.game_state = GAME_STATE_DISPLAY_TARGET
+                    elif self.arrow_mode_button.is_clicked(mouse_pos):
+                        self.game_mode = GAME_MODE_ARROW
+                        self.reset_game()
+                        if self.game_state != GAME_STATE_CONFIRM_PLAYER:
+                            self.game_state = GAME_STATE_PLAYING  # Modo seta começa direto jogando
+                    elif self.instructions_button.is_clicked(mouse_pos):
+                        self.game_state = GAME_STATE_INSTRUCTIONS
+                    elif self.highscore_button.is_clicked(mouse_pos):
+                        self.game_state = GAME_STATE_HIGHSCORE
                 
                 elif self.game_state == GAME_STATE_PLAYING:
                     # Verifica todas as escadas rolantes por personagens clicados
@@ -720,13 +991,21 @@ class Game:
                                 self.data_collector.record_selection(True)
                                 if self.game_mode == GAME_MODE_SINGLE:
                                     # No modo único, encontrar o personagem uma vez termina o jogo com sucesso
-                                    self.game_state = GAME_STATE_SUCCESS
+                                    self.last_score = self.score
+                                    self.game_state = GAME_STATE_NAME_INPUT
                                 else:
-                                    # No modo múltiplo, continuamos até que todas as instâncias sejam encontradas ou clique errado
                                     # Remove o personagem da escada rolante
                                     escalator.characters.remove(clicked_character)
-                                    if self.game_mode == GAME_MODE_MULTIPLE and self.score >= self.target_max_spawns:
-                                        self.game_state = GAME_STATE_SUCCESS
+                                    if self.game_mode == GAME_MODE_ALTERNATING:
+                                        # No modo alternado, seleciona um novo alvo após cada acerto
+                                        # Cria novo alvo com características diferentes
+                                        self.select_new_target()
+                                        self.has_target_spawned = False
+                                        self.is_first_target = False  # Não é mais o primeiro alvo
+                                        # Volta para o estado DISPLAY_TARGET para mostrar o novo personagem
+                                        self.game_state = GAME_STATE_DISPLAY_TARGET
+                                        # Inicia nova tentativa para o próximo alvo
+                                        self.data_collector.start_new_trial(self.game_mode)
                                     elif self.game_mode == GAME_MODE_INFINITE:
                                         # Adiciona bônus de tempo para modo infinito
                                         self.time_limit += self.time_bonus
@@ -744,16 +1023,73 @@ class Game:
                                     self.time_limit -= 3  # Penalidade de 3 segundos
                                 else:
                                     # Outros modos ainda terminam com clique errado
-                                    self.game_state = GAME_STATE_FAILURE
+                                    self.last_score = self.score
+                                    self.game_state = GAME_STATE_NAME_INPUT
                             break
+                    
+                    # Tratamento de cliques nos quadrantes para o modo seta
+                    if self.game_mode == GAME_MODE_ARROW:
+                        clicked_quadrant = self.get_clicked_quadrant(mouse_pos)
+                        if clicked_quadrant is not None:
+                            self.selections_total += 1
+                            
+                            # Verifica se clicou no quadrante correto E a seta está apontando para ele
+                            if (clicked_quadrant == self.target_quadrant and self.arrow_in_target_zone):
+                                # ACERTO PERFEITO! Quadrante correto no momento correto
+                                self.score += 1
+                                self.selections_correct += 1
+                                self.data_collector.update_trial_score(self.score)
+                                # Registra métricas detalhadas do modo seta
+                                self.data_collector.record_arrow_selection(
+                                    True, clicked_quadrant, self.target_quadrant, 
+                                    self.arrow_angle, self.arrow_rotation_speed, self.arrow_in_target_zone
+                                )
+                                # Modo seta não recebe bônus de tempo - tempo fixo de 90 segundos
+                                # Seleciona novo quadrante alvo com nova velocidade
+                                self.select_new_arrow_target()
+                                # Inicia nova tentativa
+                                self.data_collector.start_new_trial(self.game_mode)
+                            else:
+                                # ERRO: Quadrante errado OU timing errado
+                                self.data_collector.update_trial_score(self.score)
+                                # Registra métricas detalhadas do erro
+                                self.data_collector.record_arrow_selection(
+                                    False, clicked_quadrant, self.target_quadrant, 
+                                    self.arrow_angle, self.arrow_rotation_speed, self.arrow_in_target_zone
+                                )
+                                # Modo seta não tem penalidade de tempo - tempo fixo de 90 segundos
+                
+                elif self.game_state == GAME_STATE_INSTRUCTIONS or self.game_state == GAME_STATE_HIGHSCORE:
+                    if self.back_button.is_clicked(mouse_pos):
+                        self.game_state = GAME_STATE_MENU
+                
+                elif self.game_state == GAME_STATE_NAME_INPUT:
+                    result = self.highscore_input.handle_event(event)
+                    if result is not None or self.highscore_confirm_button.is_clicked(mouse_pos):
+                        # Pega o nome do input, com tratamento correto para espaços
+                        name = result if result is not None else self.highscore_input.text
+                        # Limpa o nome antes de usar
+                        clean_name = name.strip() if name else ""
+                        self.add_highscore(clean_name, self.last_score, self.game_mode)
+                        self.data_collector.set_username(clean_name if clean_name else "Anônimo")  # Salva nome para coleta de dados
+                        self.game_state = GAME_STATE_MENU
+                
+
         
         # Atualiza estados de hover dos botões
         if self.game_state == GAME_STATE_MENU:
             self.single_mode_button.check_hover(mouse_pos)
-            self.multiple_mode_button.check_hover(mouse_pos)
+            self.alternating_mode_button.check_hover(mouse_pos)
             self.infinite_mode_button.check_hover(mouse_pos)
+            self.arrow_mode_button.check_hover(mouse_pos)
+            self.instructions_button.check_hover(mouse_pos)
+            self.highscore_button.check_hover(mouse_pos)
         elif self.game_state == GAME_STATE_USER_INPUT:
             self.confirm_button.check_hover(mouse_pos)
+        elif self.game_state == GAME_STATE_INSTRUCTIONS or self.game_state == GAME_STATE_HIGHSCORE:
+            self.back_button.check_hover(mouse_pos)
+        elif self.game_state == GAME_STATE_NAME_INPUT:
+            self.highscore_confirm_button.check_hover(mouse_pos)
     
     def reset_game(self):
         # Reinicia o estado do jogo
@@ -768,8 +1104,19 @@ class Game:
         self.score = 0
         self.selections_total = 0
         self.selections_correct = 0
+        self.is_first_target = True  # Reseta para o primeiro alvo
         
-        # Cria uma nova sessão para cada reinício do jogo para garantir coleta precisa de dados
+        # Reset variáveis do modo seta
+        if self.game_mode == GAME_MODE_ARROW:
+            self.arrow_angle = 0
+            self.arrow_in_target_zone = False
+            self.last_quadrant_pointed = -1
+            self.select_new_arrow_target()
+            self.time_limit = 90  # 90 segundos fixos para o modo seta
+            # Define o start_time para o modo seta já que ele não passa por DISPLAY_TARGET
+            self.start_time = time.time()
+        
+        # Cria nova sessão para cada jogo e inicia nova trial
         self.data_collector.create_new_session(self.game_mode)
         self.data_collector.start_new_trial(self.game_mode)
     
@@ -798,24 +1145,38 @@ class Game:
     def update(self):
         if self.game_state == GAME_STATE_USER_INPUT:
             self.text_input.update()
+        elif self.game_state == GAME_STATE_NAME_INPUT:
+            self.highscore_input.update()
         
         current_time = time.time()
         
         # Manipula transições de estado do jogo
         if self.game_state == GAME_STATE_DISPLAY_TARGET:
+            # Determina o tempo de exibição baseado no modo e se é o primeiro alvo
+            if self.game_mode == GAME_MODE_ALTERNATING and not self.is_first_target:
+                display_time = 2.5  # Tempo menor para alvos subsequentes no modo alternado
+            else:
+                display_time = self.display_target_time  # Tempo normal
+            
             # Muda para estado de jogo após o tempo de exibição
-            if current_time - self.target_display_start >= self.display_target_time:
+            if current_time - self.target_display_start >= display_time:
                 self.game_state = GAME_STATE_PLAYING
-                self.start_time = current_time
+                if self.start_time == 0:  # Só define start_time na primeira vez
+                    self.start_time = current_time
         
         # Atualiza todas as escadas rolantes
         for escalator in self.escalators:
             escalator.update()
         
         if self.game_state == GAME_STATE_PLAYING:
+            # Para o modo seta, garante que o start_time está definido
+            if self.game_mode == GAME_MODE_ARROW and self.start_time == 0:
+                self.start_time = current_time
+            
             # Verifica se o tempo acabou
             if current_time - self.start_time >= self.time_limit:
-                self.game_state = GAME_STATE_FAILURE
+                self.last_score = self.score
+                self.game_state = GAME_STATE_NAME_INPUT
                 # Atualiza maior pontuação se necessário
                 if self.score > self.highest_score:
                     self.highest_score = self.score
@@ -833,10 +1194,10 @@ class Game:
                     else:
                         # Sempre faz aparecer um personagem aleatório não-alvo
                         self.spawn_character(target=False)
-                elif self.game_mode == GAME_MODE_MULTIPLE:
-                    # No modo múltiplo, faz o alvo aparecer várias vezes
-                    if self.target_spawn_count < self.target_max_spawns and random.random() < 0.15:
-                        # 15% de chance de fazer o alvo aparecer cada vez
+                elif self.game_mode == GAME_MODE_ALTERNATING:
+                    # No modo alternado, sempre garante que haja um alvo
+                    if not self.has_target_spawned and random.random() < 0.2:
+                        # 20% de chance de fazer o alvo aparecer quando não há um
                         self.spawn_character(target=True)
                     else:
                         # Faz aparecer um personagem aleatório não-alvo
@@ -849,45 +1210,504 @@ class Game:
                     else:
                         # Faz aparecer um personagem aleatório não-alvo
                         self.spawn_character(target=False)
+            
+            # Atualiza a seta no modo seta
+            if self.game_mode == GAME_MODE_ARROW:
+                self.arrow_angle += self.arrow_rotation_speed
+                if self.arrow_angle >= 360:
+                    self.arrow_angle = 0
+                
+                # Verifica se a seta está apontando para o quadrante correto com alta precisão
+                pointed_quadrant = self.get_arrow_pointed_quadrant()
+                self.arrow_in_target_zone = (pointed_quadrant == self.target_quadrant and pointed_quadrant != -1)
+                self.last_quadrant_pointed = pointed_quadrant
 
-    def draw_character_traits(self, y_pos):
-        # Desenha o texto descrevendo as características do personagem
-        head_text = TINY_FONT.render(f"Cabeça: {self.target_traits['head']['name']}", True, (0, 0, 0))
-        face_text = TINY_FONT.render(f"Rosto: {self.target_traits['face']['name']}", True, (0, 0, 0))
-        body_text = TINY_FONT.render(f"Corpo: {self.target_traits['body']['name']}", True, (0, 0, 0))
-        hat_text = TINY_FONT.render(f"Chapéu: {self.target_traits['hat']['name']}", True, (0, 0, 0))
+    def select_new_arrow_target(self):
+        """Seleciona um novo quadrante alvo e define a cor da seta"""
+        self.target_quadrant = random.randint(0, 3)
+        self.arrow_color = QUADRANT_COLORS[self.target_quadrant]
+        # Velocidade entre 2 (mais lento) e 8 (mais rápido)
+        self.arrow_rotation_speed = random.uniform(2.0, 8.0)  # Entre 2 e 8
+    
+    def get_arrow_pointed_quadrant(self):
+        """Determina para qual quadrante a seta está apontando - ativa quando ENTRA no quadrante"""
+        # Normaliza o ângulo para 0-360
+        angle = self.arrow_angle % 360
         
-        screen.blit(head_text, (WIDTH//2 - 100, y_pos))
-        screen.blit(face_text, (WIDTH//2 - 100, y_pos + 20))
-        screen.blit(body_text, (WIDTH//2 - 100, y_pos + 40))
-        screen.blit(hat_text, (WIDTH//2 - 100, y_pos + 60))
+        # Mapeamento correto dos quadrantes visuais:
+        # Quadrante 0 (Superior Esquerdo): 180° - 270°
+        # Quadrante 1 (Superior Direito): 270° - 360° (0°)
+        # Quadrante 2 (Inferior Esquerdo): 90° - 180°
+        # Quadrante 3 (Inferior Direito): 0° - 90°
+        
+        # Expande a janela para começar mais cedo (quando entra no quadrante)
+        if 270 <= angle or angle < 90:  # Direita (superior + inferior direito)
+            if 270 <= angle or angle < 0:  # Superior direito
+                return 1
+            else:  # 0 <= angle < 90 - Inferior direito
+                return 3
+        elif 90 <= angle < 270:  # Esquerda (superior + inferior esquerdo)
+            if 180 <= angle < 270:  # Superior esquerdo
+                return 0
+            else:  # 90 <= angle < 180 - Inferior esquerdo
+                return 2
+        else:
+            return -1
+    
+    def get_clicked_quadrant(self, mouse_pos):
+        """Determina qual quadrante foi clicado baseado na posição do mouse"""
+        mx, my = mouse_pos
+        center_x, center_y = WIDTH // 2, HEIGHT // 2
+        
+        if mx < center_x and my < center_y:
+            return 0  # Superior esquerdo
+        elif mx >= center_x and my < center_y:
+            return 1  # Superior direito
+        elif mx < center_x and my >= center_y:
+            return 2  # Inferior esquerdo
+        else:
+            return 3  # Inferior direito
+    
+    def draw_arrow_mode(self):
+        """Desenha a interface do modo seta"""
+        center_x, center_y = WIDTH // 2, HEIGHT // 2
+        
+        # Desenha os quadrantes coloridos
+        for i in range(4):
+            quadrant_color = QUADRANT_COLORS[i]
+            
+            # Se é o quadrante alvo e a seta está apontando para ele, destaca com brilho
+            if i == self.target_quadrant and self.arrow_in_target_zone:
+                # Quadrante brilhante quando é a hora certa de clicar
+                bright_color = tuple(min(255, c + 50) for c in quadrant_color)
+                quadrant_color = bright_color
+            elif i == self.target_quadrant:
+                # Quadrante alvo mas seta não está apontando - fica um pouco mais escuro
+                dark_color = tuple(max(50, c - 30) for c in quadrant_color)
+                quadrant_color = dark_color
+            
+            # Desenha cada quadrante
+            if i == 0:  # Superior esquerdo
+                pygame.draw.rect(screen, quadrant_color, (0, 0, center_x, center_y))
+            elif i == 1:  # Superior direito
+                pygame.draw.rect(screen, quadrant_color, (center_x, 0, center_x, center_y))
+            elif i == 2:  # Inferior esquerdo
+                pygame.draw.rect(screen, quadrant_color, (0, center_y, center_x, center_y))
+            else:  # Inferior direito
+                pygame.draw.rect(screen, quadrant_color, (center_x, center_y, center_x, center_y))
+        
+        # Desenha linhas divisórias
+        pygame.draw.line(screen, GAME_BLACK, (center_x, 0), (center_x, HEIGHT), 4)
+        pygame.draw.line(screen, GAME_BLACK, (0, center_y), (WIDTH, center_y), 4)
+        
+        # Desenha a seta no centro
+        self.draw_arrow(center_x, center_y)
+        
+        # Exibe informações do jogo
+        score_text = FONT.render(f"Pontuação: {self.score}", True, GAME_WHITE)
+        screen.blit(score_text, (10, 10))
+        
+        current_time = time.time()
+        time_left = max(0, self.time_limit - (current_time - self.start_time))
+        time_text = FONT.render(f"Tempo: {time_left:.1f}s", True, GAME_WHITE)
+        screen.blit(time_text, (10, 50))
+        
+        # Mostra a velocidade atual da seta
+        speed_text = SMALL_FONT.render(f"Velocidade: {self.arrow_rotation_speed:.1f}", True, GAME_WHITE)
+        screen.blit(speed_text, (10, 90))
+        
+        # Precisão é coletada internamente mas não mostrada ao jogador
+        
+        # Instruções simples para o jogador
+        if self.arrow_in_target_zone:
+            instruction_text = SMALL_FONT.render("🎯 AGORA! Clique no quadrante brilhante!", True, GAME_GOLD)
+            instruction_bg_color = (50, 100, 50)  # Verde escuro
+        else:
+            instruction_text = SMALL_FONT.render("Aguarde a seta apontar para o quadrante da mesma cor!", True, GAME_WHITE)
+            instruction_bg_color = (0, 0, 0)  # Preto
+        
+        instruction_rect = instruction_text.get_rect(centerx=WIDTH//2, y=HEIGHT - 50)
+        pygame.draw.rect(screen, instruction_bg_color, instruction_rect.inflate(20, 10))
+        screen.blit(instruction_text, instruction_rect)
+    
+    def draw_arrow(self, center_x, center_y):
+        """Desenha a seta girando no centro da tela"""
+        import math
+        
+        # Tamanho da seta
+        arrow_length = 80
+        arrow_width = 20
+        
+        # Calcula as posições da seta baseado no ângulo
+        angle_rad = math.radians(self.arrow_angle)
+        
+        # Ponta da seta
+        tip_x = center_x + arrow_length * math.cos(angle_rad)
+        tip_y = center_y + arrow_length * math.sin(angle_rad)
+        
+        # Base da seta
+        base_angle1 = angle_rad + math.radians(150)
+        base_angle2 = angle_rad + math.radians(210)
+        
+        base1_x = center_x + (arrow_length - 30) * math.cos(base_angle1)
+        base1_y = center_y + (arrow_length - 30) * math.sin(base_angle1)
+        
+        base2_x = center_x + (arrow_length - 30) * math.cos(base_angle2)
+        base2_y = center_y + (arrow_length - 30) * math.sin(base_angle2)
+        
+        # Desenha a seta como um triângulo
+        arrow_points = [(tip_x, tip_y), (base1_x, base1_y), (base2_x, base2_y)]
+        
+        # Sombra da seta
+        shadow_points = [(p[0] + 2, p[1] + 2) for p in arrow_points]
+        pygame.draw.polygon(screen, GAME_BLACK, shadow_points)
+        
+        # Seta principal
+        pygame.draw.polygon(screen, self.arrow_color, arrow_points)
+        
+        # Borda da seta
+        pygame.draw.polygon(screen, GAME_BLACK, arrow_points, 3)
+        
+        # Círculo no centro
+        pygame.draw.circle(screen, GAME_BLACK, (center_x, center_y), 15)
+        pygame.draw.circle(screen, GAME_WHITE, (center_x, center_y), 12)
 
     def draw_menu(self):
-        # Desenha a tela do menu
-        if self.menu_image:
-            # Se a imagem do menu existe, desenha na tela
-            screen.blit(self.menu_image, (0, 0))  # Desenha a imagem no canto superior esquerdo
+        # Fundo simples e limpo com gradiente suave
+        for y in range(HEIGHT):
+            ratio = y / HEIGHT
+            # Gradiente suave do azul claro para azul médio
+            r = int(135 + (45 - 135) * ratio)  # 135 -> 45
+            g = int(206 + (85 - 206) * ratio)  # 206 -> 85  
+            b = int(235 + (160 - 235) * ratio) # 235 -> 160
+            pygame.draw.line(screen, (r, g, b), (0, y), (WIDTH, y))
+        
+        # Título principal simples com cor que contrasta
+        title_text = "Memory Escalator"
+        title_x = WIDTH//2 - GAME_TITLE_FONT.size(title_text)[0]//2
+        
+        # Sombra mais visível para contorno
+        title_shadow = GAME_TITLE_FONT.render(title_text, True, (0, 0, 0))
+        # Desenha sombra em múltiplas posições para criar contorno
+        for dx, dy in [(-2, -2), (-2, 2), (2, -2), (2, 2), (-2, 0), (2, 0), (0, -2), (0, 2)]:
+            screen.blit(title_shadow, (title_x + dx, 50 + dy))
+        
+        # Título principal em branco para máximo contraste
+        title_main = GAME_TITLE_FONT.render(title_text, True, (255, 255, 255))
+        screen.blit(title_main, (title_x, 50))
+        
+        # Subtítulo com cor mais escura
+        subtitle_text = "Jogo da Memória na Escada Rolante"
+        subtitle_x = WIDTH//2 - GAME_SUBTITLE_FONT.size(subtitle_text)[0]//2
+        
+        # Sombra do subtítulo para contorno
+        subtitle_shadow = GAME_SUBTITLE_FONT.render(subtitle_text, True, (0, 0, 0))
+        for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            screen.blit(subtitle_shadow, (subtitle_x + dx, 120 + dy))
+        
+        # Subtítulo em branco para melhor contraste
+        subtitle = GAME_SUBTITLE_FONT.render(subtitle_text, True, (255, 255, 255))
+        screen.blit(subtitle, (subtitle_x, 120))
+        
+        # Linha decorativa em cor escura
+        line_y = 160
+        pygame.draw.line(screen, (30, 50, 90), (WIDTH//2 - 200, line_y), (WIDTH//2 + 200, line_y), 2)
+        
+        # Instruções
+        instructions = SMALL_FONT.render("Selecione o Modo de Jogo:", True, (255, 255, 255))
+        screen.blit(instructions, (WIDTH//2 - instructions.get_width()//2, 190))
+        
+        # Desenha os botões
+        self.single_mode_button.draw(screen)
+        self.alternating_mode_button.draw(screen)
+        self.infinite_mode_button.draw(screen)
+        self.arrow_mode_button.draw(screen)
+        self.instructions_button.draw(screen)
+        self.highscore_button.draw(screen)
+        
+        # PS simples direcionando para Como Jogar
+        ps_text = "PS: Para descobrir mais sobre como jogar e os modos de jogo, clique em 'Como Jogar'"
+        ps_render = TINY_FONT.render(ps_text, True, (200, 200, 200))
+        screen.blit(ps_render, (WIDTH//2 - ps_render.get_width()//2, HEIGHT - 80))
+        
+        # Footer simples - ajustado para tela maior
+        footer_y = HEIGHT - 40
+        footer_text = "Pressione ESC para sair"
+        footer = TINY_FONT.render(footer_text, True, (200, 200, 200))
+        screen.blit(footer, (WIDTH//2 - footer.get_width()//2, footer_y))
+    
+    def draw_instructions(self):
+        # Mesmo fundo simples do menu
+        for y in range(HEIGHT):
+            ratio = y / HEIGHT
+            r = int(135 + (45 - 135) * ratio)
+            g = int(206 + (85 - 206) * ratio)
+            b = int(235 + (160 - 235) * ratio)
+            pygame.draw.line(screen, (r, g, b), (0, y), (WIDTH, y))
+        
+        # Título maior e mais grosso - ajustado para tela maior
+        title_text = "TUTORIAL - Como Jogar"
+        title_shadow = INSTRUCTIONS_TITLE_FONT.render(title_text, True, (0, 0, 0, 100))
+        screen.blit(title_shadow, (WIDTH//2 - title_shadow.get_width()//2 + 3, 33))
+        
+        title = INSTRUCTIONS_TITLE_FONT.render(title_text, True, (255, 255, 255))
+        screen.blit(title, (WIDTH//2 - title.get_width()//2, 30))
+        
+        # Tutorial passo a passo - layout melhorado
+        sections = [
+            {
+                "title": "PASSO 1: MEMORIZE",
+                "color": GAME_GOLD,
+                "items": [
+                    "Um personagem aparecerá na tela por 4 segundos",
+                    "Observe TODAS as características: cabeça, rosto, corpo e chapéu", 
+                    "Memorize bem! Você precisará encontrá-lo depois"
+                ]
+            },
+            {
+                "title": "PASSO 2: PROCURE", 
+                "color": GAME_GOLD,
+                "items": [
+                    "Personagens começarão a descer pelas escadas rolantes",
+                    "Cada escada tem velocidade diferente (rápida, média, lenta)",
+                    "Encontre o personagem EXATO que você memorizou"
+                ]
+            },
+            {
+                "title": "PASSO 3: CLIQUE",
+                "color": GAME_GOLD, 
+                "items": [
+                    "Clique NO personagem correto quando ele aparecer",
+                    "Acertou = Pontos!",
+                    "Errou = Fim de jogo (exceto no modo infinito: -3s)"
+                ]
+            },
+            {
+                "title": "MODOS DISPONÍVEIS:",
+                "color": GAME_LIGHT_BLUE,
+                "items": [
+                    "APARIÇÃO ÚNICA: Encontre o personagem 1 vez (30 segundos)",
+                    "MODO ALTERNADO: Personagem muda a cada acerto (30 segundos)", 
+                    "MODO INFINITO: Continue encontrando, ganhe +5s por acerto!",
+                    "MODO SETA: 90 segundos fixos - máxima pontuação possível!"
+                ]
+            },
+            {
+                "title": "MODO SETA - REGRAS ESPECIAIS:",
+                "color": GAME_LIGHT_BLUE,
+                "items": [
+                    "Você tem EXATOS 90 segundos para pontuar o máximo possível",
+                    "A seta gira e muda de cor constantemente",
+                    "Clique no quadrante da mesma COR da seta",
+                    "TIMING É TUDO: Só vale quando a seta APONTA para o quadrante correto!",
+                    "Velocidade muda a cada acerto - mantenha o foco!"
+                ]
+            },
+            {
+                "title": "DICAS IMPORTANTES:",
+                "color": GAME_GREEN,
+                "items": [
+                    "Preste atenção nos DETALHES de cada parte do personagem",
+                    "Não clique muito rápido - observe bem antes de clicar",
+                    "Use ESC para voltar ao menu a qualquer momento",
+                    "No modo infinito: erro reduz tempo, acerto adiciona tempo"
+                ]
+            }
+        ]
+        
+        y_pos = 110  # Posição inicial otimizada
+        for section in sections:
+            # Desenha o título da seção com fonte maior e mais grossa
+            title_text = INSTRUCTIONS_TEXT_FONT.render(section["title"], True, section["color"])
+            screen.blit(title_text, (WIDTH//2 - title_text.get_width()//2, y_pos))
+            y_pos += 38  # Espaço reduzido após título da seção
+            
+            # Desenha linha decorativa para passos - linha mais larga para tela maior
+            if section["title"].startswith("PASSO"):
+                pygame.draw.line(screen, section["color"], 
+                               (WIDTH//2 - 250, y_pos), 
+                               (WIDTH//2 + 250, y_pos), 3)
+                y_pos += 15  # Espaço reduzido após linha
+            
+            # Desenha os itens da seção com fontes maiores e melhor espaçamento
+            for item in section["items"]:
+                # Usa fonte maior para os itens
+                if section["title"].startswith("MODOS"):
+                    item_text = SMALL_FONT.render(item, True, GAME_SILVER)
+                else:
+                    item_text = SMALL_FONT.render(item, True, GAME_WHITE)
+                
+                # Centraliza o texto
+                item_x = WIDTH//2 - item_text.get_width()//2
+                screen.blit(item_text, (item_x, y_pos))
+                y_pos += 26  # Espaço reduzido entre itens
+            
+            # Espaço entre seções - reduzido para caber na tela
+            y_pos += 18
+        
+        # Verifica se há espaço suficiente para o destaque final
+        remaining_space = HEIGHT - 100 - y_pos  # Deixa espaço para o botão voltar
+        
+        if remaining_space > 50:  # Se há espaço suficiente
+            # Destaque final - ajustado para tela maior
+            final_tip = "Lembre-se: Paciência e atenção são a chave do sucesso!"
+            final_text = SMALL_FONT.render(final_tip, True, GAME_GOLD)
+            # Caixa de destaque
+            pygame.draw.rect(screen, (0, 0, 0, 50), 
+                            (WIDTH//2 - final_text.get_width()//2 - 15, y_pos - 8, 
+                             final_text.get_width() + 30, 35), border_radius=12)
+            screen.blit(final_text, (WIDTH//2 - final_text.get_width()//2, y_pos))
+        
+        # Botão voltar
+        self.back_button.draw(screen)
+    
+    def draw_highscores(self):
+        # Mesmo fundo simples do menu
+        for y in range(HEIGHT):
+            ratio = y / HEIGHT
+            r = int(135 + (45 - 135) * ratio)
+            g = int(206 + (85 - 206) * ratio)
+            b = int(235 + (160 - 235) * ratio)
+            pygame.draw.line(screen, (r, g, b), (0, y), (WIDTH, y))
+        
+        # Título maior e mais grosso
+        title_text = "Melhores Pontuações"
+        title_shadow = HIGHSCORE_TITLE_FONT.render(title_text, True, (0, 0, 0, 100))
+        screen.blit(title_shadow, (WIDTH//2 - title_shadow.get_width()//2 + 3, 33))
+        
+        title = HIGHSCORE_TITLE_FONT.render(title_text, True, (255, 255, 255))
+        screen.blit(title, (WIDTH//2 - title.get_width()//2, 30))
+        
+        # Duas colunas - modo infinito e modo seta
+        left_x = WIDTH // 4
+        right_x = WIDTH * 3 // 4
+        
+        # Modo Infinito - Coluna esquerda
+        mode_title_infinite = HIGHSCORE_TEXT_FONT.render("Modo Infinito", True, GAME_GOLD)
+        screen.blit(mode_title_infinite, (left_x - mode_title_infinite.get_width()//2, 100))
+        
+        # Linha decorativa
+        pygame.draw.line(screen, GAME_GOLD, 
+                        (left_x - 120, 140), 
+                        (left_x + 120, 140), 3)
+        
+        # Pontuações do modo infinito
+        scores_infinite = self.highscores.get("infinite", [])
+        y_pos_left = 160
+        
+        if not scores_infinite:
+            no_scores = SMALL_FONT.render("Nenhuma pontuação ainda", True, GAME_WHITE)
+            screen.blit(no_scores, (left_x - no_scores.get_width()//2, y_pos_left))
         else:
-            # Se a imagem não existe, desenha o menu padrão
-            title = TITLE_FONT.render("Jogo da Memória na Escada Rolante", True, (50, 50, 150))
-            screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//4))
+            for j, score_data in enumerate(scores_infinite[:5]):  # Top 5
+                rank = f"{j+1}º"
+                name = score_data["name"][:12]  # Nome menor para caber na coluna
+                score = score_data["score"]
+                
+                # Cor baseada na posição
+                if j == 0:
+                    color = GAME_GOLD
+                    medal = "🥇"
+                elif j == 1:
+                    color = GAME_SILVER  
+                    medal = "🥈"
+                elif j == 2:
+                    color = (205, 127, 50)  # Bronze
+                    medal = "🥉"
+                else:
+                    color = GAME_WHITE
+                    medal = ""
+                
+                # Formato melhorado com medal emoji
+                if j < 3:
+                    score_text = f"{medal} {rank} {name} - {score}"
+                else:
+                    score_text = f"{rank} {name} - {score}"
+                
+                text_surf = SMALL_FONT.render(score_text, True, color)
+                screen.blit(text_surf, (left_x - text_surf.get_width()//2, y_pos_left))
+                y_pos_left += 40
 
-            instructions = SMALL_FONT.render("Selecione o Modo de Jogo:", True, (0, 0, 0))
-            screen.blit(instructions, (WIDTH//2 - instructions.get_width()//2, HEIGHT//2 - 120))
+        # Modo Seta - Coluna direita
+        mode_title_arrow = HIGHSCORE_TEXT_FONT.render("Modo Seta", True, GAME_LIGHT_BLUE)
+        screen.blit(mode_title_arrow, (right_x - mode_title_arrow.get_width()//2, 100))
         
-            # Desenha os botões de seleção de modo
-            self.single_mode_button.draw(screen)
-            self.multiple_mode_button.draw(screen)
-            self.infinite_mode_button.draw(screen)
+        # Linha decorativa
+        pygame.draw.line(screen, GAME_LIGHT_BLUE, 
+                        (right_x - 120, 140), 
+                        (right_x + 120, 140), 3)
         
-            # Desenha as descrições dos modos de jogo
-            single_desc = TINY_FONT.render("Encontre o personagem mostrado no início (aparece uma vez)", True, (0, 0, 0))
-            multiple_desc = TINY_FONT.render(f"Encontre todas as {self.target_max_spawns} aparições do personagem", True, (0, 0, 0))
-            infinite_desc = TINY_FONT.render("Encontre personagens para ganhar mais tempo - jogue até perder!", True, (0, 0, 0))
+        # Pontuações do modo seta
+        scores_arrow = self.highscores.get("arrow", [])
+        y_pos_right = 160
         
-            screen.blit(single_desc, (WIDTH//2 - single_desc.get_width()//2, HEIGHT//2 - 35))
-            screen.blit(multiple_desc, (WIDTH//2 - multiple_desc.get_width()//2, HEIGHT//2 + 35))
-            screen.blit(infinite_desc, (WIDTH//2 - infinite_desc.get_width()//2, HEIGHT//2 + 105))
+        if not scores_arrow:
+            no_scores = SMALL_FONT.render("Nenhuma pontuação ainda", True, GAME_WHITE)
+            screen.blit(no_scores, (right_x - no_scores.get_width()//2, y_pos_right))
+        else:
+            for j, score_data in enumerate(scores_arrow[:5]):  # Top 5
+                rank = f"{j+1}º"
+                name = score_data["name"][:12]  # Nome menor para caber na coluna
+                score = score_data["score"]
+                
+                # Cor baseada na posição
+                if j == 0:
+                    color = GAME_GOLD
+                    medal = "🥇"
+                elif j == 1:
+                    color = GAME_SILVER  
+                    medal = "🥈"
+                elif j == 2:
+                    color = (205, 127, 50)  # Bronze
+                    medal = "🥉"
+                else:
+                    color = GAME_WHITE
+                    medal = ""
+                
+                # Formato melhorado com medal emoji
+                if j < 3:
+                    score_text = f"{medal} {rank} {name} - {score}"
+                else:
+                    score_text = f"{rank} {name} - {score}"
+                
+                text_surf = SMALL_FONT.render(score_text, True, color)
+                screen.blit(text_surf, (right_x - text_surf.get_width()//2, y_pos_right))
+                y_pos_right += 40
+        
+        # Botão voltar
+        self.back_button.draw(screen)
+    
+    def draw_name_input(self):
+        # Mesmo fundo simples do menu
+        for y in range(HEIGHT):
+            ratio = y / HEIGHT
+            r = int(135 + (45 - 135) * ratio)
+            g = int(206 + (85 - 206) * ratio)
+            b = int(235 + (160 - 235) * ratio)
+            pygame.draw.line(screen, (r, g, b), (0, y), (WIDTH, y))
+        
+        # Título
+        if self.is_new_highscore:
+            title = GAME_SUBTITLE_FONT.render("NOVO RECORDE!", True, GAME_GOLD)
+            subtitle = SMALL_FONT.render(f"Você fez {self.last_score} pontos!", True, GAME_WHITE)
+        else:
+            title = GAME_SUBTITLE_FONT.render("Fim de Jogo", True, GAME_WHITE)
+            subtitle = SMALL_FONT.render(f"Pontuação: {self.last_score}", True, GAME_WHITE)
+        
+        screen.blit(title, (WIDTH//2 - title.get_width()//2, HEIGHT//2 - 100))
+        screen.blit(subtitle, (WIDTH//2 - subtitle.get_width()//2, HEIGHT//2 - 60))
+        
+        # Prompt
+        prompt = SMALL_FONT.render("Digite seu nome:", True, GAME_WHITE)
+        screen.blit(prompt, (WIDTH//2 - prompt.get_width()//2, HEIGHT//2 - 20))
+        
+        # Campo de entrada
+        self.highscore_input.draw(screen)
+        self.highscore_confirm_button.draw(screen)
+        
+        # Instrução
+        instruction = TINY_FONT.render("Pressione Enter ou clique em Salvar", True, GAME_WHITE)
+        screen.blit(instruction, (WIDTH//2 - instruction.get_width()//2, HEIGHT//2 + 150))
 
     def draw(self):
         # Limpa a tela
@@ -907,68 +1727,129 @@ class Game:
         elif self.game_state == GAME_STATE_MENU:
             self.draw_menu()
             
+        elif self.game_state == GAME_STATE_HIGHSCORE:
+            self.draw_highscores()
+            
+        elif self.game_state == GAME_STATE_INSTRUCTIONS:
+            self.draw_instructions()
+            
+        elif self.game_state == GAME_STATE_NAME_INPUT:
+            self.draw_name_input()
+            
         elif self.game_state == GAME_STATE_DISPLAY_TARGET:
             # Exibe o personagem alvo
             if self.game_mode == GAME_MODE_SINGLE:
                 mode_text = "Modo Aparição Única"
-            elif self.game_mode == GAME_MODE_MULTIPLE:
-                mode_text = "Modo Múltiplas Aparições"
+            elif self.game_mode == GAME_MODE_ALTERNATING:
+                mode_text = "Modo Alternado"
             else:
                 mode_text = "Modo Infinito"
 
             mode_render = SMALL_FONT.render(mode_text, True, (50, 50, 150))
             screen.blit(mode_render, (WIDTH//2 - mode_render.get_width()//2, 20))
             
-            text = FONT.render("Lembre-se deste personagem:", True, (0, 0, 0))
-            screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//4))
+            # Usa fonte maior para "MEMORIZE" - texto diferente para modo alternado
+            if self.game_mode == GAME_MODE_ALTERNATING and not self.is_first_target:
+                memorize_text = GAME_TITLE_FONT.render("NOVO ALVO!", True, (220, 30, 30))  # Vermelho para destacar
+                subtitle_text = SMALL_FONT.render("Memorize o novo personagem", True, (0, 0, 0))
+                screen.blit(subtitle_text, (WIDTH//2 - subtitle_text.get_width()//2, HEIGHT//4 + 60))
+            else:
+                memorize_text = GAME_TITLE_FONT.render("MEMORIZE", True, (0, 0, 0))
+            screen.blit(memorize_text, (WIDTH//2 - memorize_text.get_width()//2, HEIGHT//4))
             
             # Desenha o personagem alvo
             self.target_character.draw(screen)
             
-            # Desenha a descrição das características do personagem
-            self.draw_character_traits(HEIGHT//2 + 50)
+            # Exibe a contagem regressiva centralizada
+            if self.game_mode == GAME_MODE_ALTERNATING and not self.is_first_target:
+                display_time = 2.5
+                countdown_text = "Continuando em:"
+            else:
+                display_time = self.display_target_time
+                countdown_text = "Iniciando em:"
             
-            # Exibe a contagem regressiva
-            time_left = max(0, self.display_target_time - (time.time() - self.target_display_start))
-            countdown = FONT.render(f"Iniciando em: {time_left:.1f}", True, (0, 0, 0))
+            time_left = max(0, display_time - (time.time() - self.target_display_start))
+            countdown = FONT.render(f"{countdown_text} {time_left:.1f}", True, (0, 0, 0))
             screen.blit(countdown, (WIDTH//2 - countdown.get_width()//2, HEIGHT*3//4))
             
+            # Mostra pontuação atual no modo alternado
+            if self.game_mode == GAME_MODE_ALTERNATING and self.score > 0:
+                score_text = SMALL_FONT.render(f"Pontuação atual: {self.score}", True, (0, 100, 0))
+                screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, HEIGHT*3//4 + 40))
+            
         elif self.game_state == GAME_STATE_PLAYING:
-            # Desenha todas as escadas rolantes
-            for escalator in self.escalators:
-                escalator.draw(screen)
-            
-            # Exibe o tempo restante
-            time_left = max(0, self.time_limit - (time.time() - self.start_time))
-            time_text = SMALL_FONT.render(f"Tempo Restante: {time_left:.1f}s", True, (0, 0, 0))
-            screen.blit(time_text, (10, 10))
-            
-            # Exibe a pontuação
-            if self.game_mode == GAME_MODE_SINGLE:
-                mode_text = "Encontre uma vez"
-            elif self.game_mode == GAME_MODE_MULTIPLE:
-                mode_text = f"Encontre {self.target_spawn_count}/{self.target_max_spawns}"
-            else:  # Modo infinito
-                mode_text = f"+{self.time_bonus}s por acerto"
-            
-            score_text = SMALL_FONT.render(f"Pontuação: {self.score} - {mode_text}", True, (0, 0, 0))
-            screen.blit(score_text, (10, 40))
-            
-            # Exibe a precisão no modo infinito
-            if self.game_mode == GAME_MODE_INFINITE and self.selections_total > 0:
-                accuracy = (self.selections_correct / self.selections_total) * 100
-                accuracy_text = SMALL_FONT.render(f"Precisão: {accuracy:.1f}%", True, (0, 0, 0))
-                screen.blit(accuracy_text, (10, 70))
-            
-            # No caso do modo múltiplo, mostra um pequeno lembrete de como o personagem se parece
-            if self.game_mode != GAME_MODE_SINGLE:
-                reminder_text = TINY_FONT.render("Personagem Alvo:", True, (0, 0, 0))
-                screen.blit(reminder_text, (10, 100))
+            if self.game_mode == GAME_MODE_ARROW:
+                # Desenha a interface do modo seta
+                self.draw_arrow_mode()
+            else:
+                # Desenha todas as escadas rolantes para outros modos
+                for escalator in self.escalators:
+                    escalator.draw(screen)
                 
-                # Desenha uma versão pequena do alvo
-                mini_character = Character(20, 120, self.target_traits)
-                mini_character.size = CHARACTER_SIZE // 2  # Torna menor
-                mini_character.draw(screen)
+                # Desenha barra de progresso no topo em vez do timer
+                time_left = max(0, self.time_limit - (time.time() - self.start_time))
+                progress = time_left / self.time_limit if self.time_limit > 0 else 0
+            
+                # Barra de progresso - fundo
+                progress_bar_width = WIDTH - 40
+                progress_bar_height = 20
+                progress_bar_x = 20
+                progress_bar_y = 10
+                
+                # Fundo da barra (cinza escuro)
+                pygame.draw.rect(screen, (100, 100, 100), (progress_bar_x, progress_bar_y, progress_bar_width, progress_bar_height))
+                
+                # Barra de progresso (verde para vermelho baseado no tempo)
+                if progress > 0.5:
+                    bar_color = (0, 180, 0)  # Verde
+                elif progress > 0.25:
+                    bar_color = (255, 215, 0)  # Amarelo/Dourado
+                else:
+                    bar_color = (220, 30, 30)  # Vermelho
+                
+                progress_width = int(progress_bar_width * progress)
+                if progress_width > 0:
+                    pygame.draw.rect(screen, bar_color, (progress_bar_x, progress_bar_y, progress_width, progress_bar_height))
+                
+                # Borda da barra de progresso
+                pygame.draw.rect(screen, (50, 50, 50), (progress_bar_x, progress_bar_y, progress_bar_width, progress_bar_height), 2)
+                
+                # Exibe a pontuação
+                if self.game_mode == GAME_MODE_SINGLE:
+                    mode_text = "Encontre uma vez"
+                elif self.game_mode == GAME_MODE_ALTERNATING:
+                    mode_text = f"Personagem alterna: {self.score} acertos"
+                else:  # Modo infinito
+                    mode_text = f"+{self.time_bonus}s por acerto"
+                
+                score_text = SMALL_FONT.render(f"Pontuação: {self.score} - {mode_text}", True, (0, 0, 0))
+                screen.blit(score_text, (10, 40))
+                
+                # Removida a exibição da precisão conforme solicitado
+                
+                # No caso do modo múltiplo, mostra um pequeno lembrete de como o personagem se parece
+                if self.game_mode != GAME_MODE_SINGLE:
+                    reminder_text = TINY_FONT.render("Personagem Alvo:", True, (0, 0, 0))
+                    screen.blit(reminder_text, (10, 70))
+                    
+                    # Desenha uma versão pequena do alvo com tamanho correto
+                    mini_size = int(CHARACTER_SIZE * 0.75)  # 75% do tamanho original para melhor visibilidade
+                    mini_segment_height = mini_size // 3
+                    
+                    # Redimensiona e desenha cada parte do personagem
+                    body_img = pygame.transform.scale(self.target_traits["body"]["image"], (mini_size, mini_segment_height))
+                    head_img = pygame.transform.scale(self.target_traits["head"]["image"], (mini_size, mini_segment_height))
+                    face_img = pygame.transform.scale(self.target_traits["face"]["image"], (mini_size, mini_segment_height))
+                    hat_img = pygame.transform.scale(self.target_traits["hat"]["image"], (mini_size, mini_segment_height))
+                    
+                    # Posição do mini personagem
+                    mini_x, mini_y = 20, 90
+                    
+                    # Desenha as partes na ordem correta
+                    screen.blit(body_img, (mini_x, mini_y + mini_segment_height * 2))  # Corpo na parte inferior
+                    screen.blit(head_img, (mini_x, mini_y + mini_segment_height))      # Cabeça no meio
+                    screen.blit(face_img, (mini_x, mini_y + mini_segment_height))      # Rosto sobre a cabeça
+                    screen.blit(hat_img, (mini_x, mini_y))                            # Chapéu no topo
             
         elif self.game_state == GAME_STATE_SUCCESS:
             text = FONT.render("Sucesso! Você encontrou o personagem!", True, (0, 128, 0))
