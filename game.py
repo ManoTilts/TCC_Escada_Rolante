@@ -65,8 +65,8 @@ CHARACTER_SPAWN_RATE = 60  # Frames entre aparições de personagens
 
 # Fontes - aumentadas para tela maior
 FONT = pygame.font.SysFont('Arial', 42)
-SMALL_FONT = pygame.font.SysFont('Arial', 28)
-TINY_FONT = pygame.font.SysFont('Arial', 20)
+SMALL_FONT = pygame.font.SysFont('Arial', 24)
+TINY_FONT = pygame.font.SysFont('Arial', 18)
 TITLE_FONT = pygame.font.SysFont('Arial', 56, bold=True)
 
 # Fontes para estilo de jogo
@@ -78,7 +78,7 @@ try:
     BUTTON_FONT = pygame.font.SysFont('Trebuchet MS', 28, bold=True)
     # Fontes maiores e mais grossas para instruções e highscore
     INSTRUCTIONS_TITLE_FONT = pygame.font.SysFont('Trebuchet MS', 64, bold=True)
-    INSTRUCTIONS_TEXT_FONT = pygame.font.SysFont('Trebuchet MS', 34, bold=True)
+    INSTRUCTIONS_TEXT_FONT = pygame.font.SysFont('Trebuchet MS', 28, bold=True)
     HIGHSCORE_TITLE_FONT = pygame.font.SysFont('Trebuchet MS', 64, bold=True)
     HIGHSCORE_TEXT_FONT = pygame.font.SysFont('Trebuchet MS', 36, bold=True)
 except:
@@ -89,7 +89,7 @@ except:
     BUTTON_FONT = pygame.font.SysFont('Arial', 28, bold=True)
     # Fontes maiores e mais grossas para instruções e highscore
     INSTRUCTIONS_TITLE_FONT = pygame.font.SysFont('Arial', 64, bold=True)
-    INSTRUCTIONS_TEXT_FONT = pygame.font.SysFont('Arial', 34, bold=True)
+    INSTRUCTIONS_TEXT_FONT = pygame.font.SysFont('Arial', 28, bold=True)
     HIGHSCORE_TITLE_FONT = pygame.font.SysFont('Arial', 64, bold=True)
     HIGHSCORE_TEXT_FONT = pygame.font.SysFont('Arial', 36, bold=True)
 
@@ -478,13 +478,24 @@ class GameDataCollector:
         self.all_sessions = self.load_existing_data()
         self.current_session = {
             "session_id": datetime.now().strftime("%Y%m%d_%H%M%S"),
-            "username": "Anônimo",  # Nome de usuário padrão
+            "username": "Anônimo",
             "game_mode": None,
             "trials": [],
-            "mouse_tracking": []
+            "mouse_tracking": [],
+            "session_metrics": {
+                "total_clicks": 0,
+                "correct_clicks": 0,
+                "incorrect_clicks": 0,
+                "missed_targets": 0,
+                "false_positives": 0,  # Cliques em personagens errados
+                "session_duration": 0,
+                "focus_breaks": 0  # Períodos longos sem interação
+            }
         }
         self.current_trial = None
         self.target_spawn_time = None
+        self.last_interaction_time = time.time()
+        self.clicks_positions = []  # Armazena posições de todos os cliques
     
     def load_existing_data(self):
         # Verifica se já existe um arquivo de dados
@@ -543,19 +554,32 @@ class GameDataCollector:
         # Em vez de sobrescrever o modo de jogo da sessão, armazena em cada tentativa
         self.current_trial = {
             "trial_start_time": time.time(),
-            "game_mode": game_mode,  # Registra o modo de jogo por tentativa
+            "game_mode": game_mode,
             "target_character": None,
             "target_spawn_time": None,
             "selection_time": None,
             "success": False,
             "reaction_time": None,
-            "score": 0  # Inicializa a pontuação para esta tentativa
+            "score": 0,
+            "trial_metrics": {
+                "mouse_movements": 0,  # Quantidade de movimentos do mouse
+                "hesitation_time": 0,  # Tempo de hesitação antes do clique
+                "clicks_before_success": 0,  # Número de cliques antes de acertar
+                "average_mouse_speed": 0,  # Velocidade média do mouse
+                "mouse_path_length": 0  # Comprimento do caminho do mouse
+            }
         }
         
         # Para o modo seta, já define o target_spawn_time como agora
         # pois o alvo (quadrante colorido) está sempre visível
         if game_mode == 3:  # GAME_MODE_ARROW
             self.current_trial["target_spawn_time"] = time.time()
+        
+        # Reset variáveis de rastreamento da trial
+        self.clicks_positions = []
+        self.mouse_movement_count = 0
+        self.last_mouse_pos = None
+        self.total_mouse_distance = 0
     
     def update_trial_score(self, score):
         if self.current_trial:
@@ -575,12 +599,79 @@ class GameDataCollector:
             self.target_spawn_time = time.time()
 
     def record_mouse_position(self, mouse_pos, game_state):
+        current_time = time.time()
+        
+        # Registra posição do mouse
         self.current_session["mouse_tracking"].append({
-            "timestamp": time.time(),
+            "timestamp": current_time,
             "x": mouse_pos[0],
             "y": mouse_pos[1],
             "game_state": game_state
         })
+        
+        # Calcula métricas de movimento do mouse durante a tentativa
+        if self.current_trial and self.last_mouse_pos:
+            # Calcula distância percorrida
+            dx = mouse_pos[0] - self.last_mouse_pos[0]
+            dy = mouse_pos[1] - self.last_mouse_pos[1]
+            distance = (dx**2 + dy**2)**0.5
+            
+            # Considera movimento apenas se for significativo (> 5 pixels)
+            if distance > 5:
+                self.mouse_movement_count += 1
+                self.total_mouse_distance += distance
+        
+        # Detecta quebra de foco (mais de 3 segundos sem interação)
+        # Garante que session_metrics existe (compatibilidade com dados antigos)
+        if "session_metrics" not in self.current_session:
+            self.current_session["session_metrics"] = {
+                "total_clicks": 0,
+                "correct_clicks": 0,
+                "incorrect_clicks": 0,
+                "missed_targets": 0,
+                "false_positives": 0,
+                "session_duration": 0,
+                "focus_breaks": 0
+            }
+        
+        if current_time - self.last_interaction_time > 3.0:
+            self.current_session["session_metrics"]["focus_breaks"] += 1
+        
+        self.last_interaction_time = current_time
+        self.last_mouse_pos = mouse_pos
+    
+    def record_click(self, position, success):
+        """Registra um clique para análise de precisão"""
+        self.clicks_positions.append({
+            "x": position[0],
+            "y": position[1],
+            "timestamp": time.time(),
+            "success": success
+        })
+        
+        # Garante que session_metrics existe (compatibilidade com dados antigos)
+        if "session_metrics" not in self.current_session:
+            self.current_session["session_metrics"] = {
+                "total_clicks": 0,
+                "correct_clicks": 0,
+                "incorrect_clicks": 0,
+                "missed_targets": 0,
+                "false_positives": 0,
+                "session_duration": 0,
+                "focus_breaks": 0
+            }
+        
+        # Atualiza métricas da sessão
+        self.current_session["session_metrics"]["total_clicks"] += 1
+        if success:
+            self.current_session["session_metrics"]["correct_clicks"] += 1
+        else:
+            self.current_session["session_metrics"]["incorrect_clicks"] += 1
+            self.current_session["session_metrics"]["false_positives"] += 1
+        
+        # Atualiza métricas da tentativa
+        if self.current_trial:
+            self.current_trial["trial_metrics"]["clicks_before_success"] += 1
     
     def record_selection(self, success):
         if self.current_trial and self.target_spawn_time:
@@ -588,8 +679,30 @@ class GameDataCollector:
             self.current_trial["selection_time"] = selection_time
             self.current_trial["success"] = success
             self.current_trial["reaction_time"] = selection_time - self.target_spawn_time
+            
+            # Calcula métricas adicionais
+            trial_duration = selection_time - self.current_trial["trial_start_time"]
+            self.current_trial["trial_metrics"]["mouse_movements"] = self.mouse_movement_count
+            
+            if self.total_mouse_distance > 0 and trial_duration > 0:
+                self.current_trial["trial_metrics"]["average_mouse_speed"] = self.total_mouse_distance / trial_duration
+                self.current_trial["trial_metrics"]["mouse_path_length"] = self.total_mouse_distance
+            
+            # Calcula tempo de hesitação (diferença entre ver o alvo e clicar)
+            if self.current_trial["target_spawn_time"]:
+                hesitation = selection_time - self.current_trial["target_spawn_time"]
+                self.current_trial["trial_metrics"]["hesitation_time"] = hesitation
+            
+            # Adiciona posições dos cliques
+            self.current_trial["clicks"] = self.clicks_positions.copy()
+            
             self.current_session["trials"].append(self.current_trial)
             self.current_trial = None
+            
+            # Reset variáveis
+            self.clicks_positions = []
+            self.mouse_movement_count = 0
+            self.total_mouse_distance = 0
     
     def record_arrow_selection(self, success, clicked_quadrant, target_quadrant, arrow_angle, arrow_speed, arrow_in_zone):
         """Registra uma seleção específica do modo seta com métricas detalhadas"""
@@ -610,8 +723,24 @@ class GameDataCollector:
                 "quadrant_accuracy": "correct" if clicked_quadrant == target_quadrant else "wrong_quadrant"
             }
             
+            # Calcula métricas adicionais
+            trial_duration = selection_time - self.current_trial["trial_start_time"]
+            self.current_trial["trial_metrics"]["mouse_movements"] = self.mouse_movement_count
+            
+            if self.total_mouse_distance > 0 and trial_duration > 0:
+                self.current_trial["trial_metrics"]["average_mouse_speed"] = self.total_mouse_distance / trial_duration
+                self.current_trial["trial_metrics"]["mouse_path_length"] = self.total_mouse_distance
+            
+            # Adiciona posições dos cliques
+            self.current_trial["clicks"] = self.clicks_positions.copy()
+            
             self.current_session["trials"].append(self.current_trial)
             self.current_trial = None
+            
+            # Reset variáveis
+            self.clicks_positions = []
+            self.mouse_movement_count = 0
+            self.total_mouse_distance = 0
     
     def create_new_session(self, game_mode=None):
         # Adiciona a sessão atual a all_sessions antes de criar uma nova
@@ -627,17 +756,45 @@ class GameDataCollector:
             "username": self.current_session["username"],  # Mantém o mesmo nome de usuário
             "game_mode": game_mode,  # Armazena o modo de jogo na sessão
             "trials": [],
-            "mouse_tracking": []
+            "mouse_tracking": [],
+            "session_metrics": {
+                "total_clicks": 0,
+                "correct_clicks": 0,
+                "incorrect_clicks": 0,
+                "missed_targets": 0,
+                "false_positives": 0,
+                "session_duration": 0,
+                "focus_breaks": 0
+            }
         }
     
     def prepare_session_for_saving(self, session):
+        # Garante que session_metrics existe (compatibilidade com dados antigos)
+        if "session_metrics" not in session:
+            session["session_metrics"] = {
+                "total_clicks": 0,
+                "correct_clicks": 0,
+                "incorrect_clicks": 0,
+                "missed_targets": 0,
+                "false_positives": 0,
+                "session_duration": 0,
+                "focus_breaks": 0
+            }
+        
+        # Calcula duração total da sessão
+        if session["trials"]:
+            first_trial_time = session["trials"][0]["trial_start_time"]
+            last_trial_time = session["trials"][-1].get("selection_time", session["trials"][-1]["trial_start_time"])
+            session["session_metrics"]["session_duration"] = last_trial_time - first_trial_time
+        
         # Cria uma cópia serializável dos dados da sessão
         serializable_session = {
             "session_id": session["session_id"],
             "username": session["username"],
             "game_mode": session["game_mode"],
             "trials": [],
-            "mouse_tracking": session["mouse_tracking"]
+            "mouse_tracking": session["mouse_tracking"],
+            "session_metrics": session["session_metrics"]
         }
         
         # Converte os dados das tentativas para formato serializável
@@ -649,8 +806,11 @@ class GameDataCollector:
                 "selection_time": trial["selection_time"],
                 "success": trial["success"],
                 "reaction_time": trial["reaction_time"],
-                "score": trial.get("score", 0)
+                "score": trial.get("score", 0),
+                "trial_metrics": trial.get("trial_metrics", {}),
+                "clicks": trial.get("clicks", [])
             }
+            
             # Inclui target_character apenas se existir
             if trial.get("target_character"):
                 serializable_trial["target_character"] = {
@@ -659,6 +819,11 @@ class GameDataCollector:
                     'body': {'name': trial["target_character"]["body"]["name"]},
                     'hat': {'name': trial["target_character"]["hat"]["name"]}
                 }
+            
+            # Inclui métricas da seta se existir
+            if trial.get("arrow_metrics"):
+                serializable_trial["arrow_metrics"] = trial["arrow_metrics"]
+                
             serializable_session["trials"].append(serializable_trial)
             
         return serializable_session
@@ -987,6 +1152,7 @@ class Game:
                                 self.score += 1
                                 self.selections_total += 1
                                 self.selections_correct += 1
+                                self.data_collector.record_click(mouse_pos, True)
                                 self.data_collector.update_trial_score(self.score)
                                 self.data_collector.record_selection(True)
                                 if self.game_mode == GAME_MODE_SINGLE:
@@ -1016,6 +1182,7 @@ class Game:
                             else:
                                 # Personagem errado clicado
                                 self.selections_total += 1
+                                self.data_collector.record_click(mouse_pos, False)
                                 self.data_collector.update_trial_score(self.score)  # Registra pontuação final antes de terminar tentativa
                                 self.data_collector.record_selection(False)
                                 if self.game_mode == GAME_MODE_INFINITE:
@@ -1038,6 +1205,7 @@ class Game:
                                 # ACERTO PERFEITO! Quadrante correto no momento correto
                                 self.score += 1
                                 self.selections_correct += 1
+                                self.data_collector.record_click(mouse_pos, True)
                                 self.data_collector.update_trial_score(self.score)
                                 # Registra métricas detalhadas do modo seta
                                 self.data_collector.record_arrow_selection(
@@ -1051,6 +1219,7 @@ class Game:
                                 self.data_collector.start_new_trial(self.game_mode)
                             else:
                                 # ERRO: Quadrante errado OU timing errado
+                                self.data_collector.record_click(mouse_pos, False)
                                 self.data_collector.update_trial_score(self.score)
                                 # Registra métricas detalhadas do erro
                                 self.data_collector.record_arrow_selection(
@@ -1515,35 +1684,53 @@ class Game:
             }
         ]
         
-        y_pos = 110  # Posição inicial otimizada
+        y_pos = 100  # Posição inicial otimizada
         for section in sections:
-            # Desenha o título da seção com fonte maior e mais grossa
-            title_text = INSTRUCTIONS_TEXT_FONT.render(section["title"], True, section["color"])
-            screen.blit(title_text, (WIDTH//2 - title_text.get_width()//2, y_pos))
-            y_pos += 38  # Espaço reduzido após título da seção
+            # Usa fontes diferenciadas por seção
+            if section["title"].startswith("DICAS"):
+                title_font = TINY_FONT
+                item_font = TINY_FONT
+                title_spacing = 24
+                item_spacing = 18
+                section_spacing = 10
+            elif section["title"].startswith("MODO SETA"):
+                title_font = SMALL_FONT
+                item_font = TINY_FONT
+                title_spacing = 30
+                item_spacing = 20
+                section_spacing = 12
+            else:
+                title_font = INSTRUCTIONS_TEXT_FONT
+                item_font = SMALL_FONT
+                title_spacing = 32
+                item_spacing = 23
+                section_spacing = 14
             
-            # Desenha linha decorativa para passos - linha mais larga para tela maior
+            # Desenha o título da seção
+            title_text = title_font.render(section["title"], True, section["color"])
+            screen.blit(title_text, (WIDTH//2 - title_text.get_width()//2, y_pos))
+            y_pos += title_spacing
+            
+            # Desenha linha decorativa para passos
             if section["title"].startswith("PASSO"):
                 pygame.draw.line(screen, section["color"], 
                                (WIDTH//2 - 250, y_pos), 
                                (WIDTH//2 + 250, y_pos), 3)
-                y_pos += 15  # Espaço reduzido após linha
+                y_pos += 12
             
-            # Desenha os itens da seção com fontes maiores e melhor espaçamento
+            # Desenha os itens da seção
             for item in section["items"]:
-                # Usa fonte maior para os itens
                 if section["title"].startswith("MODOS"):
-                    item_text = SMALL_FONT.render(item, True, GAME_SILVER)
+                    item_text = item_font.render(item, True, GAME_SILVER)
                 else:
-                    item_text = SMALL_FONT.render(item, True, GAME_WHITE)
+                    item_text = item_font.render(item, True, GAME_WHITE)
                 
-                # Centraliza o texto
                 item_x = WIDTH//2 - item_text.get_width()//2
                 screen.blit(item_text, (item_x, y_pos))
-                y_pos += 26  # Espaço reduzido entre itens
+                y_pos += item_spacing
             
-            # Espaço entre seções - reduzido para caber na tela
-            y_pos += 18
+            # Espaço entre seções
+            y_pos += section_spacing
         
         # Verifica se há espaço suficiente para o destaque final
         remaining_space = HEIGHT - 100 - y_pos  # Deixa espaço para o botão voltar

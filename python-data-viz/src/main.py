@@ -2,6 +2,7 @@ from tkinter import filedialog, simpledialog
 import tkinter as tk
 from utils.json_reader import read_json
 from visualization.heatmap import generate_heatmap
+from visualization.game_mode_analysis import generate_comprehensive_report, display_report_window
 
 def display_data_table(data, on_heatmap_request=None):
     """
@@ -81,9 +82,13 @@ def display_data_table(data, on_heatmap_request=None):
                 if game_mode == 0 or game_mode == "0":
                     game_mode_display = "Modo de Aparição Única"
                 elif game_mode == 1 or game_mode == "1":
-                    game_mode_display = "Modo de Múltiplas Aparições"
+                    game_mode_display = "Modo Alternado"
                 elif game_mode == 2 or game_mode == "2":
                     game_mode_display = "Modo Infinito"
+                elif game_mode == 3 or game_mode == "3":
+                    game_mode_display = "Modo Seta Colorida"
+                else:
+                    game_mode_display = f"Modo Desconhecido ({game_mode})"
                     
                 # Calcula pontuação e taxa de sucesso
                 successful_trials = sum(1 for trial in trials if trial.get('success', False))
@@ -230,6 +235,20 @@ def display_data_table(data, on_heatmap_request=None):
         if on_heatmap_request:
             heatmap_button = tk.Button(button_frame, text="Gerar Mapa de Calor para Sessão Selecionada", command=on_generate_heatmap)
             heatmap_button.pack(side=tk.LEFT, padx=5)
+        
+        # Adiciona botão para análise por modo de jogo
+        def on_generate_mode_analysis():
+            # Gera análise completa por modo de jogo
+            try:
+                report = generate_comprehensive_report(data)
+                display_report_window(report)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                tk.messagebox.showerror("Erro na Análise", f"Erro ao gerar análise por modo: {str(e)}")
+        
+        mode_analysis_button = tk.Button(button_frame, text="Análise por Modo de Jogo", command=on_generate_mode_analysis)
+        mode_analysis_button.pack(side=tk.LEFT, padx=5)
         
         # Adiciona botão de exportação
         def export_data():
