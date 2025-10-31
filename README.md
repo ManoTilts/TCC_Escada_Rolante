@@ -1,5 +1,19 @@
 # TCC_Escada_Rolante
 
+## 📌 Versões Disponíveis
+
+### 🎮 Versão Original (game.py)
+- Arquivo monolítico completo
+- Testado e estável
+- Localização: `game.py` na pasta raiz
+
+### ✨ Versão Refatorada (refactored/)
+- **RECOMENDADA** - Código organizado em módulos
+- Fácil manutenção e expansão
+- Localização: `refactored/main.py`
+- **Execute:** `cd refactored && python main.py`
+- [Ver documentação completa](refactored/README.md)
+
 ## Sobre o Projeto
 
 Este projeto foi desenvolvido como parte de um Trabalho de Conclusão de Curso (TCC) para estudar a atenção, tempo de reação e padrões comportamentais em jogadores, com foco especial em indivíduos com TDAH (Transtorno do Déficit de Atenção com Hiperatividade).
