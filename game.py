@@ -1489,7 +1489,7 @@ class Game:
         
         # Instruções simples para o jogador
         if self.arrow_in_target_zone:
-            instruction_text = SMALL_FONT.render("🎯 AGORA! Clique no quadrante brilhante!", True, GAME_GOLD)
+            instruction_text = SMALL_FONT.render("AGORA! Clique no quadrante brilhante!", True, GAME_GOLD)
             instruction_bg_color = (50, 100, 50)  # Verde escuro
         else:
             instruction_text = SMALL_FONT.render("Aguarde a seta apontar para o quadrante da mesma cor!", True, GAME_WHITE)
@@ -1840,7 +1840,7 @@ class Game:
                 # Cor baseada na posição
                 if j == 0:
                     color = GAME_GOLD
-                    medal = "🥇"
+                    medal = "🥇" # Display das medalhas ta zuado
                 elif j == 1:
                     color = GAME_SILVER  
                     medal = "🥈"
@@ -1851,7 +1851,6 @@ class Game:
                     color = GAME_WHITE
                     medal = ""
                 
-                # Formato melhorado com medal emoji
                 if j < 3:
                     score_text = f"{medal} {rank} {name} - {score}"
                 else:
