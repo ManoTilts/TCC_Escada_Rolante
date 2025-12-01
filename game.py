@@ -94,7 +94,7 @@ except:
     HIGHSCORE_TEXT_FONT = pygame.font.SysFont('Arial', 36, bold=True)
 
 # Inicializa a tela
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("Memory Escalator - Jogo da Memória na Escada Rolante")
 clock = pygame.time.Clock()
 
