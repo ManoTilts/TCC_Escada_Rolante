@@ -10,7 +10,7 @@ from datetime import datetime
 pygame.init()
 
 # variáveis de configuração do jogo
-WIDTH, HEIGHT = 1400, 1000  # Tamanho maior para melhor visibilidade
+WIDTH, HEIGHT = 1000, 700  # Tamanho otimizado para telas menores
 BACKGROUND_COLOR = (200, 200, 200)
 ESCALATOR_COLORS = [(100, 100, 100), (120, 120, 120), (140, 140, 140)]
 
