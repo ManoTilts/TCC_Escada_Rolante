@@ -1001,6 +1001,13 @@ class Game:
         except:
             return {"single": [], "alternating": [], "infinite": [], "arrow": []}
     
+    def recenter_escalators(self):
+        """Recalcula as posições das escadas para centralizá-las na tela"""
+        total_width = 3 * ESCALATOR_WIDTH + 2 * ESCALATOR_SPACING
+        start_x = (WIDTH - total_width) // 2
+        for i, escalator in enumerate(self.escalators):
+            escalator.x = start_x + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
+    
     def add_highscore(self, name, score, mode):
         """Adiciona uma nova pontuação ao ranking - APENAS para modos INFINITE e ARROW"""
         # Só salva no highscore se for modo INFINITE ou ARROW
@@ -1097,6 +1104,7 @@ class Game:
                 global screen, WIDTH, HEIGHT
                 WIDTH, HEIGHT = event.w, event.h
                 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+                self.recenter_escalators()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     if self.game_state == GAME_STATE_MENU:
