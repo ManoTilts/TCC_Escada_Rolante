@@ -1010,6 +1010,32 @@ class Game:
         for i, escalator in enumerate(self.escalators):
             escalator.x = start_x + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
     
+    def reposition_menu_buttons(self):
+        """Reposiciona os botões do menu para centralizá-los"""
+        button_width, button_height = 280, 60
+        button_x = WIDTH // 2 - button_width // 2
+        
+        self.single_mode_button.rect.x = button_x
+        self.single_mode_button.rect.y = HEIGHT // 2 - 70
+        
+        self.alternating_mode_button.rect.x = button_x
+        self.alternating_mode_button.rect.y = HEIGHT // 2
+        
+        self.infinite_mode_button.rect.x = button_x
+        self.infinite_mode_button.rect.y = HEIGHT // 2 + 70
+        
+        self.arrow_mode_button.rect.x = button_x
+        self.arrow_mode_button.rect.y = HEIGHT // 2 + 140
+        
+        self.instructions_button.rect.x = button_x
+        self.instructions_button.rect.y = HEIGHT // 2 + 210
+        
+        self.highscore_button.rect.x = button_x
+        self.highscore_button.rect.y = HEIGHT // 2 + 280
+        
+        self.back_button.rect.x = 50
+        self.back_button.rect.y = HEIGHT - 100
+    
     def add_highscore(self, name, score, mode):
         """Adiciona uma nova pontuação ao ranking - APENAS para modos INFINITE e ARROW"""
         # Só salva no highscore se for modo INFINITE ou ARROW
@@ -1107,6 +1133,7 @@ class Game:
                 WIDTH, HEIGHT = event.w, event.h
                 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
                 self.recenter_escalators()
+                self.reposition_menu_buttons()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     if self.game_state == GAME_STATE_MENU:
