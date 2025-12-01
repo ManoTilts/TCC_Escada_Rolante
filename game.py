@@ -37,7 +37,10 @@ ESCALATOR_SPACING = 100  # Espaçamento entre escadas
 # Cálculo para centralizar as 3 escadas na tela
 # Total de largura ocupada: 3 * ESCALATOR_WIDTH + 2 * ESCALATOR_SPACING
 TOTAL_ESCALATORS_WIDTH = 3 * ESCALATOR_WIDTH + 2 * ESCALATOR_SPACING
-ESCALATOR_START_X = (WIDTH - TOTAL_ESCALATORS_WIDTH) // 2  # Centraliza o conjunto
+
+def get_escalator_start_x():
+    """Calcula a posição X inicial para centralizar as escadas"""
+    return (WIDTH - TOTAL_ESCALATORS_WIDTH) // 2
 
 # propriedades do personagem
 CHARACTER_SIZE = 120  # Tamanho total do personagem aumentado para melhor visibilidade
@@ -982,7 +985,7 @@ class Game:
         
         # Cria as três escadas rolantes
         for i in range(3):
-            x = ESCALATOR_START_X + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
+            x = get_escalator_start_x() + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
             escalator = Escalator(x, ESCALATOR_WIDTH, ESCALATOR_SPEEDS[i], ESCALATOR_COLORS[i])
             self.escalators.append(escalator)
         
@@ -1003,8 +1006,7 @@ class Game:
     
     def recenter_escalators(self):
         """Recalcula as posições das escadas para centralizá-las na tela"""
-        total_width = 3 * ESCALATOR_WIDTH + 2 * ESCALATOR_SPACING
-        start_x = (WIDTH - total_width) // 2
+        start_x = get_escalator_start_x()
         for i, escalator in enumerate(self.escalators):
             escalator.x = start_x + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
     
