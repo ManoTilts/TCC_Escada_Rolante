@@ -1011,7 +1011,8 @@ class Game:
             escalator.x = start_x + i * (ESCALATOR_WIDTH + ESCALATOR_SPACING)
     
     def reposition_menu_buttons(self):
-        """Reposiciona os botões do menu para centralizá-los"""
+        """Reposiciona todos os elementos da UI para centralizá-los"""
+        # Reposiciona botões do menu
         button_width, button_height = 280, 60
         button_x = WIDTH // 2 - button_width // 2
         
@@ -1035,6 +1036,26 @@ class Game:
         
         self.back_button.rect.x = 50
         self.back_button.rect.y = HEIGHT - 100
+        
+        # Reposiciona campos de texto e botões de confirmação
+        self.text_input.rect.x = WIDTH//2 - 200
+        self.text_input.rect.y = HEIGHT//2
+        
+        self.confirm_button.rect.x = WIDTH//2 - 100
+        self.confirm_button.rect.y = HEIGHT//2 + 60
+        
+        self.highscore_input.rect.x = WIDTH//2 - 200
+        self.highscore_input.rect.y = HEIGHT//2 + 50
+        
+        self.highscore_confirm_button.rect.x = WIDTH//2 - 100
+        self.highscore_confirm_button.rect.y = HEIGHT//2 + 120
+        
+        # Reposiciona botões Sim/Não
+        self.yes_button.rect.x = WIDTH//2 - 210
+        self.yes_button.rect.y = HEIGHT//2 + 60
+        
+        self.no_button.rect.x = WIDTH//2 + 50
+        self.no_button.rect.y = HEIGHT//2 + 60
     
     def add_highscore(self, name, score, mode):
         """Adiciona uma nova pontuação ao ranking - APENAS para modos INFINITE e ARROW"""
